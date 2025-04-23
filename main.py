@@ -35,11 +35,12 @@ class Category(BaseModel):
     id: str
     name: str
 
+@app.get("/{media_source}", response_class=HTMLResponse)
 @app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+async def read_root(request: Request, media_source: str = "colossal"):
+    return templates.TemplateResponse("index.html", {"request": request, "media_source": media_source})
 
-@app.get("/api/categories", response_model=List[Category])
+@app.get("/api/colossal/categories", response_model=List[Category])
 @cache(expire=3600)  # Cache for 1 hour
 async def get_categories():
     # Return the list of categories
@@ -64,7 +65,7 @@ async def get_categories():
     ]
     return categories
 
-@app.get("/api/feed", response_model=List[FeedItem])
+@app.get("/api/colossal/feed", response_model=List[FeedItem])
 @cache(expire=600)  # Cache for 10 minutes (600 seconds)
 async def get_feed(category: Optional[str] = None):
     # Construct the feed URL based on the category
