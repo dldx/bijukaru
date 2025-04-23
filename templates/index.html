@@ -261,15 +261,12 @@
             <div x-show="!loading && items.length > 0" class="gallery-wrapper">
                 <!-- Exit fullscreen button for mobile -->
                 <button
-                    x-show="isFullscreen || hideToolbar"
+                    x-show="hideToolbar"
                     @click="exitFullscreen"
                     class="exit-fullscreen-btn nav-button"
                     aria-label="Exit fullscreen">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" :class="{'hidden': !isFullscreen}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" :class="{'hidden': !isFullscreen && !hideToolbar}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" :class="{'hidden': isFullscreen || !hideToolbar}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                     </svg>
                 </button>
 
@@ -391,7 +388,7 @@
                         @click="toggleFullscreen"
                         class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none text-gray-600 dark:text-gray-400"
                         title="Toggle fullscreen">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" :class="{'hidden': isFullscreen || hideToolbar}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
                         </svg>
                     </button>
@@ -501,6 +498,9 @@
                             this.nextCategory();
                         } else if (e.key === 'f' || e.key === 'F') {
                             this.toggleFullscreen();
+                        } else if (e.key === 'Enter' && this.currentItem?.link) {
+                            // Open the current image's link in a new tab
+                            window.open(this.currentItem.link, '_blank');
                         }
 
                         // Any key press resets inactivity timer
@@ -817,7 +817,7 @@
                         // Enter fullscreen
                         document.documentElement.requestFullscreen().then(() => {
                             this.isFullscreen = true;
-                            // Also hide the toolbar
+                            // Also hide toolbar when entering fullscreen
                             this.hideToolbar = true;
                         }).catch(err => {
                             console.error('Failed to enter fullscreen mode:', err);
@@ -838,22 +838,18 @@
                         try {
                             document.exitFullscreen().then(() => {
                                 this.isFullscreen = false;
-                                // Show the toolbar again
-                                this.hideToolbar = false;
                             }).catch(err => {
                                 console.error('Failed to exit fullscreen mode:', err);
                                 this.isFullscreen = false;
-                                this.hideToolbar = false;
                             });
                         } catch (err) {
                             console.error('Error exiting fullscreen:', err);
                             this.isFullscreen = false;
-                            this.hideToolbar = false;
                         }
-                    } else {
-                        // Exit toolbar-hiding mode
-                        this.hideToolbar = false;
                     }
+
+                    // Also exit toolbar-hiding mode
+                    this.hideToolbar = false;
 
                     // Update URL
                     this.updateFullscreenURL();
