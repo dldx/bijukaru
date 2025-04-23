@@ -362,9 +362,8 @@
 
                 <!-- Pagination and controls -->
                 <div class="flex justify-between items-center text-sm control-bar" x-show="!hideToolbar">
-                    <a href="https://www.thisiscolossal.com" target="_blank"
-                        class="hidden md:block justify-center font-bold text-center">This
-                        is Colossal</a>
+                    <a href="{{ media_source_url }}" target="_blank"
+                        class="hidden md:block justify-center font-bold text-center">{{ media_source_name }}</a>
                     <!-- Category selector -->
                     <div class="flex justify-center items-center category-selector">
                         <select
@@ -688,8 +687,10 @@
                         if (this.items.length === 0) {
                             this.error = 'No images found in the feed';
                         } else {
-                            // Shuffle the items array
-                            this.shuffleArray(this.items);
+                            if ("{{ media_source }}" != 'apod') {
+                                // Shuffle the items array
+                                this.shuffleArray(this.items);
+                            }
                             // Start auto-slideshow
                             this.startAutoSlide();
                         }
