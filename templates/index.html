@@ -35,6 +35,7 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
+            -webkit-overflow-scrolling: touch;
         }
         .fade-enter-active, .fade-leave-active {
             transition: opacity 0.5s;
@@ -45,9 +46,15 @@
         .main-container {
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            height: 100%;
+            min-height: -webkit-fill-available;
             width: 100%;
             overflow: hidden;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
         }
         .gallery-wrapper {
             flex: 1;
@@ -145,6 +152,12 @@
             padding: 0.75rem;
             flex-shrink: 0;
             border-top: 1px solid rgba(0,0,0,0.1);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
         }
         .dark .control-bar {
             border-top: 1px solid rgba(255,255,255,0.1);
@@ -158,6 +171,23 @@
             padding: 1rem;
             color: white;
             z-index: 10;
+        }
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+            .control-bar {
+                padding: 0.5rem;
+            }
+
+            .category-selector select {
+                max-width: 120px;
+                font-size: 0.8rem;
+                padding: 0.3rem;
+            }
+
+            .light-toggle {
+                transform: scale(0.7);
+                margin-right: -0.5rem;
+            }
         }
     </style>
     </head>
@@ -242,7 +272,7 @@
                 <!-- Pagination and controls -->
                 <div class="flex justify-between items-center text-sm control-bar">
                     <a href="https://www.thisiscolossal.com" target="_blank"
-                        class="justify-center font-bold text-center">This
+                        class="hidden md:block justify-center font-bold text-center">This
                         is Colossal</a>
                     <!-- Category selector -->
                     <div class="flex justify-center items-center category-selector">
@@ -275,6 +305,20 @@
                                 x-text="items.length"></span>
                         </span>
                     </div>
+
+                    <!-- Fullscreen toggle button -->
+                    <button
+                        @click="toggleFullscreen"
+                        class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none text-gray-600 dark:text-gray-400"
+                        title="Toggle fullscreen">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" :class="{'hidden': isFullscreen}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                        </svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" :class="{'hidden': !isFullscreen}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+
                     <div
                         class="flex items-center space-x-2 scale-75 light-toggle">
                         <span class="text-sm">
@@ -323,7 +367,7 @@
                 direction: 'next', // Track direction of movement
                 darkMode: true, // Default to dark mode
                 selectedCategory: "", // Store selected category
-
+                isFullscreen: false, // Track fullscreen state
 
                 get currentItem() {
                     return this.items[this.currentIndex] || null;
@@ -338,6 +382,13 @@
                     const categoryParam = urlParams.get('category');
                     if (categoryParam) {
                         this.selectedCategory = categoryParam;
+                    }
+
+                    // Check for interval parameter in URL
+                    const intervalParam = urlParams.get('interval');
+                    if (intervalParam && !isNaN(intervalParam)) {
+                        // Convert seconds to milliseconds and ensure it's at least 2 seconds
+                        this.slideInterval = Math.max(2, parseInt(intervalParam)) * 1000;
                     }
 
                     // Load initial feed
@@ -356,6 +407,12 @@
                     } else {
                         url.searchParams.delete('category');
                     }
+
+                    // Preserve interval parameter if it exists
+                    if (this.slideInterval !== 10000) {
+                        url.searchParams.set('interval', this.slideInterval / 1000);
+                    }
+
                     window.history.pushState({}, '', url);
 
                     try {
@@ -497,6 +554,26 @@
                 handleImageError(event) {
                     // Replace broken images with a placeholder
                     event.target.src = 'https://placehold.co/600x400?text=Image+Not+Available';
+                },
+
+                toggleFullscreen() {
+                    if (!document.fullscreenElement) {
+                        // Enter fullscreen
+                        document.documentElement.requestFullscreen().then(() => {
+                            this.isFullscreen = true;
+                        }).catch(err => {
+                            console.error('Failed to enter fullscreen mode:', err);
+                        });
+                    } else {
+                        // Exit fullscreen
+                        if (document.exitFullscreen) {
+                            document.exitFullscreen().then(() => {
+                                this.isFullscreen = false;
+                            }).catch(err => {
+                                console.error('Failed to exit fullscreen mode:', err);
+                            });
+                        }
+                    }
                 }
             };
         }
