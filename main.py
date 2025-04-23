@@ -26,9 +26,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(lifespan=lifespan)
 
-# Add session middleware
-app.add_middleware(SessionMiddleware, secret_key="your-secret-key")
-
 # Mount static files directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
