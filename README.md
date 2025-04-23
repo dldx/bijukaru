@@ -10,8 +10,11 @@ This is an unofficial carousel gallery for [This is Colossal](https://www.thisis
 - **Dark/Light Mode**: Toggle between themes with persistent preferences
 - **Responsive Design**: Works on various screen sizes and devices
 - **Image Navigation**: Previous/next controls for manual browsing
+- **Category Navigation**: Up/down arrows to switch between categories
+- **Keyboard Shortcuts**: Navigation using arrow keys and 'f' for fullscreen
+- **Touch-Friendly Controls**: Optimized for mobile devices
 - **Fullscreen Support**: Toggle fullscreen viewing mode
-- **URL Parameters**: Configure via URL parameters (category, interval)
+- **URL Parameters**: Configure via URL parameters (category, interval, fullscreen)
 - **Image Randomization**: Shuffled display for variety
 - **Original Content Links**: Each image links to its original article
 - **Error Handling**: Graceful handling of broken images
@@ -26,6 +29,14 @@ Visit [https://colossal-gallery.vercel.app](https://colossal-gallery.vercel.app)
 
 - `category`: Filter by specific category (e.g., `?category=art`)
 - `interval`: Set custom slideshow timing in seconds (e.g., `?interval=5` for 5 seconds)
+- `fullscreen`: Start in fullscreen mode (e.g., `?fullscreen=true`)
+
+### Keyboard Navigation
+
+- **Left/Right Arrow Keys**: Navigate between images
+- **Up/Down Arrow Keys**: Navigate between categories
+- **F Key**: Toggle fullscreen mode
+- **Escape Key**: Exit fullscreen mode
 
 ## Embedding on other websites
 
@@ -38,7 +49,7 @@ To embed the gallery on your website, copy the following code and paste it into 
 For additional customization, you can use URL parameters:
 
 ```html
-<iframe src="https://colossal-gallery.vercel.app?category=photography&interval=8" width="100%" height="500px"></iframe>
+<iframe src="https://colossal-gallery.vercel.app?category=photography&interval=8&fullscreen=true" width="100%" height="500px"></iframe>
 ```
 
 ## Embedding in Obsidian

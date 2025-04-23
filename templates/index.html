@@ -261,12 +261,15 @@
             <div x-show="!loading && items.length > 0" class="gallery-wrapper">
                 <!-- Exit fullscreen button for mobile -->
                 <button
-                    x-show="isFullscreen"
+                    x-show="isFullscreen || hideToolbar"
                     @click="exitFullscreen"
                     class="exit-fullscreen-btn nav-button"
                     aria-label="Exit fullscreen">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" :class="{'hidden': !isFullscreen}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" :class="{'hidden': isFullscreen || !hideToolbar}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                     </svg>
                 </button>
 
@@ -361,7 +364,7 @@
                 </div>
 
                 <!-- Pagination and controls -->
-                <div class="flex justify-between items-center text-sm control-bar" x-show="!isFullscreen">
+                <div class="flex justify-between items-center text-sm control-bar" x-show="!hideToolbar">
                     <a href="https://www.thisiscolossal.com" target="_blank"
                         class="hidden md:block justify-center font-bold text-center">This
                         is Colossal</a>
@@ -388,11 +391,8 @@
                         @click="toggleFullscreen"
                         class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none text-gray-600 dark:text-gray-400"
                         title="Toggle fullscreen">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" :class="{'hidden': isFullscreen}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" :class="{'hidden': isFullscreen || hideToolbar}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-                        </svg>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" :class="{'hidden': !isFullscreen}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
 
@@ -444,7 +444,8 @@
                 direction: 'next', // Track direction of movement
                 darkMode: true, // Default to dark mode
                 selectedCategory: "", // Store selected category
-                isFullscreen: false, // Track fullscreen state
+                isFullscreen: false, // Track native browser fullscreen state
+                hideToolbar: false, // Track toolbar visibility state
                 exitBtnTimeout: null, // Store exit button timeout
                 buttonsTimeout: null, // Store buttons timeout
                 categories: [], // Store categories from API
@@ -571,8 +572,10 @@
                         });
                     });
 
-                    // Check for category parameter in URL
+                    // Check for URL parameters
                     const urlParams = new URLSearchParams(window.location.search);
+
+                    // Check for category parameter
                     const categoryParam = urlParams.get('category');
                     if (categoryParam) {
                         this.selectedCategory = categoryParam;
@@ -580,7 +583,7 @@
                         this.categoryIndex = Math.max(0, this.categories.findIndex(c => c.id === categoryParam));
                     }
 
-                    // Check for interval parameter in URL
+                    // Check for interval parameter
                     const intervalParam = urlParams.get('interval');
                     if (intervalParam && !isNaN(intervalParam)) {
                         // Convert seconds to milliseconds and ensure it's at least 2 seconds
@@ -589,6 +592,13 @@
 
                     // Load initial feed
                     await this.loadCategory();
+
+                    // Check for fullscreen parameter and set toolbar visibility if requested
+                    const fullscreenParam = urlParams.get('fullscreen');
+                    if (fullscreenParam === 'true' || fullscreenParam === '1') {
+                        // Simply hide the toolbar without using native fullscreen
+                        this.hideToolbar = true;
+                    }
                 },
 
                 async loadCategories() {
@@ -649,6 +659,13 @@
                     // Preserve interval parameter if it exists
                     if (this.slideInterval !== 10000) {
                         url.searchParams.set('interval', this.slideInterval / 1000);
+                    }
+
+                    // Preserve fullscreen parameter if toolbar is hidden
+                    if (this.hideToolbar) {
+                        url.searchParams.set('fullscreen', 'true');
+                    } else if (url.searchParams.has('fullscreen')) {
+                        url.searchParams.delete('fullscreen');
                     }
 
                     window.history.pushState({}, '', url);
@@ -795,38 +812,62 @@
                 },
 
                 toggleFullscreen() {
+                    // When user clicks button or presses F, use native browser fullscreen
                     if (!document.fullscreenElement) {
                         // Enter fullscreen
                         document.documentElement.requestFullscreen().then(() => {
                             this.isFullscreen = true;
+                            // Also hide the toolbar
+                            this.hideToolbar = true;
                         }).catch(err => {
                             console.error('Failed to enter fullscreen mode:', err);
+                            // Fallback to hiding toolbar if native fullscreen fails
+                            this.hideToolbar = true;
                         });
                     } else {
                         this.exitFullscreen();
                     }
+
+                    // Update URL to reflect toolbar visibility
+                    this.updateFullscreenURL();
                 },
 
                 exitFullscreen() {
-                    // Check if document is still in fullscreen before trying to exit
+                    // If we're in native fullscreen mode
                     if (document.fullscreenElement && document.exitFullscreen) {
                         try {
                             document.exitFullscreen().then(() => {
                                 this.isFullscreen = false;
+                                // Show the toolbar again
+                                this.hideToolbar = false;
                             }).catch(err => {
                                 console.error('Failed to exit fullscreen mode:', err);
-                                // Reset the state even if there was an error
                                 this.isFullscreen = false;
+                                this.hideToolbar = false;
                             });
                         } catch (err) {
                             console.error('Error exiting fullscreen:', err);
-                            // Reset the state
                             this.isFullscreen = false;
+                            this.hideToolbar = false;
                         }
                     } else {
-                        // Already not in fullscreen
-                        this.isFullscreen = false;
+                        // Exit toolbar-hiding mode
+                        this.hideToolbar = false;
                     }
+
+                    // Update URL
+                    this.updateFullscreenURL();
+                },
+
+                updateFullscreenURL() {
+                    // Update URL to reflect toolbar visibility
+                    const url = new URL(window.location.href);
+                    if (this.hideToolbar) {
+                        url.searchParams.set('fullscreen', 'true');
+                    } else if (url.searchParams.has('fullscreen')) {
+                        url.searchParams.delete('fullscreen');
+                    }
+                    window.history.pushState({}, '', url);
                 },
 
                 showControls() {
