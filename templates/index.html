@@ -1,0 +1,467 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en" class="dark">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description"
+            content="A gallery of art from Colossal RSS feed">
+        <meta name="keywords" content="art, gallery, colossal, images, rss">
+        <title>Colossal RSS Gallery</title>
+        <!-- Tailwind CSS CDN -->
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            bg: '#121212',
+                            surface: '#1e1e1e',
+                            text: '#e0e0e0'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+        <!-- Alpine.js for interactivity -->
+        <script defer
+            src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+        <style>
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.5s;
+        }
+        .fade-enter, .fade-leave-to {
+            opacity: 0;
+        }
+        .image-container {
+            position: relative;
+            overflow: hidden;
+            height: 100%; /* Fixed height for image container */
+        }
+        .gallery-container {
+            height: 90vh; /* Fixed height for entire gallery */
+        }
+        /* Toggle switch styling */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 30px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .toggle-slider {
+            background-color: #3b82f6;
+        }
+        input:checked + .toggle-slider:before {
+            transform: translateX(30px);
+        }
+        /* Progress bar styling */
+        .progress-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            height: 4px;
+            background-color: rgba(0, 0, 0, 0);
+            z-index: 10;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #3b82f6;
+            opacity: 0.2;
+            transition: width linear;
+            width: 0;
+        }
+        .dark .progress-container {
+            background-color: rgba(255, 255, 255, 0);
+        }
+        /* Navigation button styling */
+        .nav-button {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .gallery-container:hover .nav-button {
+            opacity: 1;
+        }
+    </style>
+    </head>
+    <body
+        class="bg-gray-100 dark:bg-dark-bg min-h-screen text-gray-900 dark:text-dark-text transition-colors duration-300">
+        <div class="mx-auto my-auto container" x-data="gallery()">
+            <!-- Loading state -->
+            <div x-show="loading" class="flex justify-center items-center h-64">
+                <div
+                    class="border-gray-700 dark:border-gray-300 border-b-2 rounded-full w-12 h-12 animate-spin"></div>
+            </div>
+
+            <!-- Error message -->
+            <div x-show="error"
+                class="relative bg-red-100 dark:bg-red-900 mb-4 px-4 py-3 border border-red-400 dark:border-red-700 rounded text-red-700 dark:text-red-300">
+                <span x-text="error"></span>
+            </div>
+
+            <!-- Gallery -->
+            <div x-show="!loading && items.length > 0"
+                class="mx-auto max-w-4xl">
+                <div
+                    class="relative bg-unset overflow-hidden gallery-container">
+                    <!-- Image container with fixed height -->
+                    <div class="relative image-container">
+                        <a :href="currentItem?.link" target="_blank">
+                            <img
+                                x-show="currentItem"
+                                :src="currentItem?.image_url"
+                                :alt="currentItem?.title"
+                                width="800"
+                                height="450"
+                                class="absolute inset-0 w-full h-full object-contain transition-all duration-500"
+                                @error="handleImageError"
+                                x-transition:enter="fade-enter-active"
+                                x-transition:enter-start="fade-enter"
+                                x-transition:leave="fade-leave-active"
+                                x-transition:leave-end="fade-leave-to">
+                        </a>
+                        <!-- Title overlay -->
+                        <div
+                            class="right-0 bottom-0 left-0 absolute bg-black bg-opacity-60 p-4 text-white transition-opacity duration-300">
+                            <a :href="currentItem?.link" target="_blank">
+                                <h2 x-text="currentItem?.title"
+                                    class="font-semibold"></h2>
+                            </a>
+                        </div>
+
+                        <!-- Progress bar -->
+                        <div class="progress-container">
+                            <div class="progress-bar" x-ref="progressBar"></div>
+                        </div>
+                    </div>
+
+                    <!-- Navigation buttons -->
+                    <div
+                        class="top-1/2 left-4 absolute -translate-y-1/2 transform">
+                        <button
+                            @click="prevItem"
+                            class="bg-black bg-opacity-50 hover:bg-opacity-70 p-2 rounded-full focus:outline-none text-white nav-button"
+                            aria-label="Previous image">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="w-6 h-6" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round" stroke-width="2"
+                                    d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div
+                        class="top-1/2 right-4 absolute -translate-y-1/2 transform">
+                        <button
+                            @click="nextItem"
+                            class="bg-black bg-opacity-50 hover:bg-opacity-70 p-2 rounded-full focus:outline-none text-white nav-button"
+                            aria-label="Next image">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="w-6 h-6" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round" stroke-width="2"
+                                    d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <div class="flex justify-between items-center mt-4 text-sm">
+                    <a href="https://www.thisiscolossal.com" target="_blank"
+                        class="justify-center font-bold text-center">This
+                        is Colossal</a>
+                    <!-- Category selector -->
+                    <div class="flex justify-center items-center category-selector">
+                        <select
+                            x-model="selectedCategory"
+                            @change="loadCategory()"
+                            class="bg-white dark:bg-dark-surface px-4 py-2 border-gray-300 border-unset dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-dark-text">
+                            <option value>All Posts</option>
+                            <option value="art">Art</option>
+                            <option value="craft">Craft</option>
+                            <option value="design">Design</option>
+                            <option value="photography">Photography</option>
+                            <option value="animation">Animation</option>
+                            <option value="books">Books</option>
+                            <option value="climate">Climate</option>
+                            <option value="film">Film</option>
+                            <option value="history">History</option>
+                            <option value="conversations">Conversations</option>
+                            <option value="illustration">Illustration</option>
+                            <option value="music">Music</option>
+                            <option value="nature">Nature</option>
+                            <option value="opportunities">Opportunities</option>
+                            <option value="science">Science</option>
+                            <option value="social-issues">Social Issues</option>
+                        </select>
+                    </div>
+                    <div class="flex justify-center items-center">
+                        <span class="text-gray-600 dark:text-gray-400 text-sm">
+                            <span x-text="currentIndex + 1"></span> of <span
+                                x-text="items.length"></span>
+                        </span>
+                    </div>
+                    <div
+                        class="flex items-center space-x-2 scale-50 light-toggle">
+                        <span class="text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round" stroke-width="2"
+                                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                        </span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" @click="toggleDarkMode"
+                                :checked="darkMode">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round" stroke-width="2"
+                                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                            </svg>
+                        </span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- No items message -->
+            <div x-show="!loading && items.length === 0 && !error"
+                class="p-8 text-gray-600 dark:text-gray-400 text-center">
+                No images found in the feed.
+            </div>
+        </div>
+
+        <script>
+        function gallery() {
+            return {
+                loading: true,
+                error: null,
+                items: [],
+                currentIndex: 0,
+                autoSlideInterval: null,
+                slideInterval: 10000, // Time in milliseconds between slides
+                direction: 'next', // Track direction of movement
+                darkMode: true, // Default to dark mode
+                selectedCategory: "", // Store selected category
+
+
+                get currentItem() {
+                    return this.items[this.currentIndex] || null;
+                },
+
+                async init() {
+                    // Apply dark mode on page load
+                    this.applyTheme();
+
+                    // Check for category parameter in URL
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const categoryParam = urlParams.get('category');
+                    if (categoryParam) {
+                        this.selectedCategory = categoryParam;
+                    }
+
+                    // Load initial feed
+                    await this.loadCategory();
+                },
+
+                async loadCategory() {
+                    this.loading = true;
+                    this.error = null;
+                    this.stopAutoSlide();
+
+                    // Update URL to reflect selected category
+                    const url = new URL(window.location.href);
+                    if (this.selectedCategory) {
+                        url.searchParams.set('category', this.selectedCategory);
+                    } else {
+                        url.searchParams.delete('category');
+                    }
+                    window.history.pushState({}, '', url);
+
+                    try {
+                        // Construct URL with category parameter if selected
+                        let apiUrl = '/api/feed';
+                        if (this.selectedCategory) {
+                            apiUrl += `?category=${this.selectedCategory}`;
+                        }
+
+                        const response = await fetch(apiUrl);
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch RSS feed');
+                        }
+
+                        this.items = await response.json();
+                        this.currentIndex = 0;
+
+                        if (this.items.length === 0) {
+                            this.error = 'No images found in the feed';
+                        } else {
+                            // Shuffle the items array
+                            this.shuffleArray(this.items);
+                            // Start auto-slideshow
+                            this.startAutoSlide();
+                        }
+                    } catch (err) {
+                        console.error('Error:', err);
+                        this.error = 'Failed to load gallery. Please try again later.';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                // Fisher-Yates shuffle algorithm
+                shuffleArray(array) {
+                    for (let i = array.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [array[i], array[j]] = [array[j], array[i]];
+                    }
+                    return array;
+                },
+
+                toggleDarkMode() {
+                    this.darkMode = !this.darkMode;
+                    this.applyTheme(false);
+
+                    // Save preference to localStorage
+                    localStorage.setItem('darkMode', this.darkMode);
+                },
+
+                applyTheme(checkSaved = true) {
+                    // Check if there's a saved preference (only if not called from toggleDarkMode)
+                    if (checkSaved) {
+                        const savedTheme = localStorage.getItem('darkMode');
+                        if (savedTheme !== null) {
+                            this.darkMode = savedTheme === 'true';
+                        }
+                    }
+
+                    // Apply appropriate class to html element
+                    if (this.darkMode) {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                    }
+                },
+
+                startAutoSlide() {
+                    this.autoSlideInterval = setInterval(() => {
+                        this.nextItem();
+                    }, this.slideInterval);
+
+                    // Reset and start progress bar animation
+                    this.animateProgressBar();
+                },
+
+                stopAutoSlide() {
+                    if (this.autoSlideInterval) {
+                        clearInterval(this.autoSlideInterval);
+                    }
+                    // Reset progress bar animation if exists
+                    if (this.$refs.progressBar) {
+                        this.$refs.progressBar.style.width = '0%';
+                        if (this.progressAnimation) {
+                            cancelAnimationFrame(this.progressAnimation);
+                        }
+                    }
+                },
+
+                nextItem() {
+                    this.direction = 'next';
+                    this.currentIndex = (this.currentIndex + 1) % this.items.length;
+                    // Reset progress bar
+                    if (this.$refs.progressBar) {
+                        this.animateProgressBar();
+                    }
+                    // Reset autoslide timer
+                    this.stopAutoSlide();
+                    this.startAutoSlide();
+                },
+
+                prevItem() {
+                    // Reset autoslide timer
+                    this.stopAutoSlide();
+                    this.direction = 'prev';
+                    this.currentIndex = (this.currentIndex - 1 + this.items.length) % this.items.length;
+                    // Restart immediately
+                    this.startAutoSlide();
+                },
+
+                animateProgressBar() {
+                    // Reset progress bar
+                    if (this.$refs.progressBar) {
+                        this.$refs.progressBar.style.width = '0%';
+
+                        // Cancel any existing animation
+                        if (this.progressAnimation) {
+                            cancelAnimationFrame(this.progressAnimation);
+                        }
+
+                        const startTime = performance.now();
+                        const duration = this.slideInterval; // Match the interval timing
+
+                        // Animation function
+                        const animate = (currentTime) => {
+                            const elapsedTime = currentTime - startTime;
+                            const progress = Math.min(elapsedTime / duration * 100, 100);
+                            this.$refs.progressBar.style.width = `${progress}%`;
+
+                            if (elapsedTime < duration) {
+                                this.progressAnimation = requestAnimationFrame(animate);
+                            }
+                        };
+
+                        this.progressAnimation = requestAnimationFrame(animate);
+                    }
+                },
+
+                handleImageError(event) {
+                    // Replace broken images with a placeholder
+                    event.target.src = 'https://placehold.co/600x400?text=Image+Not+Available';
+                }
+            };
+        }
+    </script>
+    </body>
+</html>
