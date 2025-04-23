@@ -17,13 +17,9 @@ from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
 
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # Initialize cache on startup
-    FastAPICache.init(InMemoryBackend(), prefix="colossal-gallery")
-    yield
+FastAPICache.init(InMemoryBackend(), prefix="colossal-gallery")
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 
 # Set up templates
