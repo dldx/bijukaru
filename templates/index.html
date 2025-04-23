@@ -30,19 +30,45 @@
         <script defer
             src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
         <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
         .fade-enter-active, .fade-leave-active {
             transition: opacity 0.5s;
         }
         .fade-enter, .fade-leave-to {
             opacity: 0;
         }
-        .image-container {
-            position: relative;
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100%;
             overflow: hidden;
-            height: 100%; /* Fixed height for image container */
         }
-        .gallery-container {
-            height: 90vh; /* Fixed height for entire gallery */
+        .gallery-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            width: 100%;
+            position: relative;
+        }
+        .image-container {
+            flex: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        .gallery-image {
+            max-height: 100%;
+            max-width: 100%;
+            object-fit: contain;
         }
         /* Toggle switch styling */
         .toggle-switch {
@@ -109,15 +135,35 @@
         .nav-button {
             opacity: 0;
             transition: opacity 0.3s ease;
+            z-index: 20;
         }
-        .gallery-container:hover .nav-button {
+        .gallery-wrapper:hover .nav-button {
             opacity: 1;
+        }
+        /* Control bar at bottom */
+        .control-bar {
+            padding: 0.75rem;
+            flex-shrink: 0;
+            border-top: 1px solid rgba(0,0,0,0.1);
+        }
+        .dark .control-bar {
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .title-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: rgba(0,0,0,0.6);
+            padding: 1rem;
+            color: white;
+            z-index: 10;
         }
     </style>
     </head>
     <body
-        class="bg-gray-100 dark:bg-dark-bg min-h-screen text-gray-900 dark:text-dark-text transition-colors duration-300">
-        <div class="mx-auto my-auto container" x-data="gallery()">
+        class="bg-gray-100 dark:bg-dark-bg text-gray-900 dark:text-dark-text transition-colors duration-300">
+        <div class="main-container" x-data="gallery()">
             <!-- Loading state -->
             <div x-show="loading" class="flex justify-center items-center h-64">
                 <div
@@ -131,77 +177,70 @@
             </div>
 
             <!-- Gallery -->
-            <div x-show="!loading && items.length > 0"
-                class="mx-auto max-w-4xl">
-                <div
-                    class="relative bg-unset overflow-hidden gallery-container">
-                    <!-- Image container with fixed height -->
-                    <div class="relative image-container">
+            <div x-show="!loading && items.length > 0" class="gallery-wrapper">
+                <!-- Image container -->
+                <div class="image-container">
+                    <div class="relative flex justify-center items-center w-full h-full">
+                        <img
+                            x-show="currentItem"
+                            :src="currentItem?.image_url"
+                            :alt="currentItem?.title"
+                            width="100%"
+                            height="100%"
+                            class="transition-all duration-500 gallery-image"
+                            @error="handleImageError"
+                            x-transition:enter="fade-enter-active"
+                            x-transition:enter-start="fade-enter"
+                            x-transition:leave="fade-leave-active"
+                            x-transition:leave-end="fade-leave-to">
+                    </div>
+
+                    <!-- Title overlay -->
+                    <div class="title-overlay">
                         <a :href="currentItem?.link" target="_blank">
-                            <img
-                                x-show="currentItem"
-                                :src="currentItem?.image_url"
-                                :alt="currentItem?.title"
-                                width="800"
-                                height="450"
-                                class="absolute inset-0 w-full h-full object-contain transition-all duration-500"
-                                @error="handleImageError"
-                                x-transition:enter="fade-enter-active"
-                                x-transition:enter-start="fade-enter"
-                                x-transition:leave="fade-leave-active"
-                                x-transition:leave-end="fade-leave-to">
+                            <h2 x-text="currentItem?.title" class="font-semibold"></h2>
                         </a>
-                        <!-- Title overlay -->
-                        <div
-                            class="right-0 bottom-0 left-0 absolute bg-black bg-opacity-60 p-4 text-white transition-opacity duration-300">
-                            <a :href="currentItem?.link" target="_blank">
-                                <h2 x-text="currentItem?.title"
-                                    class="font-semibold"></h2>
-                            </a>
-                        </div>
-
-                        <!-- Progress bar -->
-                        <div class="progress-container">
-                            <div class="progress-bar" x-ref="progressBar"></div>
-                        </div>
                     </div>
 
-                    <!-- Navigation buttons -->
-                    <div
-                        class="top-1/2 left-4 absolute -translate-y-1/2 transform">
-                        <button
-                            @click="prevItem"
-                            class="bg-black bg-opacity-50 hover:bg-opacity-70 p-2 rounded-full focus:outline-none text-white nav-button"
-                            aria-label="Previous image">
-                            <svg xmlns="http://www.w3.org/2000/svg"
-                                class="w-6 h-6" fill="none" viewBox="0 0 24 24"
-                                stroke="currentColor">
-                                <path stroke-linecap="round"
-                                    stroke-linejoin="round" stroke-width="2"
-                                    d="M15 19l-7-7 7-7" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    <div
-                        class="top-1/2 right-4 absolute -translate-y-1/2 transform">
-                        <button
-                            @click="nextItem"
-                            class="bg-black bg-opacity-50 hover:bg-opacity-70 p-2 rounded-full focus:outline-none text-white nav-button"
-                            aria-label="Next image">
-                            <svg xmlns="http://www.w3.org/2000/svg"
-                                class="w-6 h-6" fill="none" viewBox="0 0 24 24"
-                                stroke="currentColor">
-                                <path stroke-linecap="round"
-                                    stroke-linejoin="round" stroke-width="2"
-                                    d="M9 5l7 7-7 7" />
-                            </svg>
-                        </button>
+                    <!-- Progress bar -->
+                    <div class="progress-container">
+                        <div class="progress-bar" x-ref="progressBar"></div>
                     </div>
                 </div>
 
-                <!-- Pagination -->
-                <div class="flex justify-between items-center mt-4 text-sm">
+                <!-- Navigation buttons -->
+                <div class="top-1/2 left-4 absolute -translate-y-1/2 transform">
+                    <button
+                        @click="prevItem"
+                        class="bg-black bg-opacity-50 hover:bg-opacity-70 p-2 rounded-full focus:outline-none text-white nav-button"
+                        aria-label="Previous image">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                            class="w-6 h-6" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round"
+                                stroke-linejoin="round" stroke-width="2"
+                                d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="top-1/2 right-4 absolute -translate-y-1/2 transform">
+                    <button
+                        @click="nextItem"
+                        class="bg-black bg-opacity-50 hover:bg-opacity-70 p-2 rounded-full focus:outline-none text-white nav-button"
+                        aria-label="Next image">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                            class="w-6 h-6" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round"
+                                stroke-linejoin="round" stroke-width="2"
+                                d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Pagination and controls -->
+                <div class="flex justify-between items-center text-sm control-bar">
                     <a href="https://www.thisiscolossal.com" target="_blank"
                         class="justify-center font-bold text-center">This
                         is Colossal</a>
@@ -237,7 +276,7 @@
                         </span>
                     </div>
                     <div
-                        class="flex items-center space-x-2 scale-50 light-toggle">
+                        class="flex items-center space-x-2 scale-75 light-toggle">
                         <span class="text-sm">
                             <svg xmlns="http://www.w3.org/2000/svg"
                                 class="w-5 h-5" fill="none" viewBox="0 0 24 24"
@@ -263,7 +302,6 @@
                         </span>
                     </div>
                 </div>
-
             </div>
 
             <!-- No items message -->
