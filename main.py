@@ -31,9 +31,38 @@ class FeedItem(BaseModel):
     link: str
     description: Optional[str] = None
 
+class Category(BaseModel):
+    id: str
+    name: str
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/api/categories", response_model=List[Category])
+@cache(expire=3600)  # Cache for 1 hour
+async def get_categories():
+    # Return the list of categories
+    categories = [
+        Category(id="", name="All Posts"),
+        Category(id="art", name="Art"),
+        Category(id="craft", name="Craft"),
+        Category(id="design", name="Design"),
+        Category(id="photography", name="Photography"),
+        Category(id="animation", name="Animation"),
+        Category(id="books", name="Books"),
+        Category(id="climate", name="Climate"),
+        Category(id="film", name="Film"),
+        Category(id="history", name="History"),
+        Category(id="conversations", name="Conversations"),
+        Category(id="illustration", name="Illustration"),
+        Category(id="music", name="Music"),
+        Category(id="nature", name="Nature"),
+        Category(id="opportunities", name="Opportunities"),
+        Category(id="science", name="Science"),
+        Category(id="social-issues", name="Social Issues"),
+    ]
+    return categories
 
 @app.get("/api/feed", response_model=List[FeedItem])
 @cache(expire=600)  # Cache for 10 minutes (600 seconds)

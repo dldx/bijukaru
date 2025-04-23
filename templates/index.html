@@ -77,6 +77,28 @@
             max-width: 100%;
             object-fit: contain;
         }
+        /* Exit fullscreen button for mobile */
+        .exit-fullscreen-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 30;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .exit-fullscreen-btn.visible {
+            opacity: 1;
+            visibility: visible;
+        }
         /* Toggle switch styling */
         .toggle-switch {
             position: relative;
@@ -141,11 +163,13 @@
         /* Navigation button styling */
         .nav-button {
             opacity: 0;
-            transition: opacity 0.3s ease;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
             z-index: 20;
         }
-        .gallery-wrapper:hover .nav-button {
+        .nav-button.visible {
             opacity: 1;
+            visibility: visible;
         }
         /* Control bar at bottom */
         .control-bar {
@@ -189,6 +213,33 @@
                 margin-right: -0.5rem;
             }
         }
+        /* Category navigation buttons */
+        .category-nav-button {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            z-index: 20;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .category-nav-button.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .category-up {
+            top: 15vh;
+        }
+        .category-down {
+            bottom: 15vh;
+        }
     </style>
     </head>
     <body
@@ -208,6 +259,41 @@
 
             <!-- Gallery -->
             <div x-show="!loading && items.length > 0" class="gallery-wrapper">
+                <!-- Exit fullscreen button for mobile -->
+                <button
+                    x-show="isFullscreen"
+                    @click="exitFullscreen"
+                    class="exit-fullscreen-btn nav-button"
+                    aria-label="Exit fullscreen">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+
+                <!-- Category navigation - Up arrow -->
+                <button
+                    @click="prevCategory"
+                    class="opacity-80 hover:opacity-100 category-nav-button category-up nav-button"
+                    x-show="categories.length > 1"
+                    aria-label="Previous category">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                    </svg>
+                    <span x-text="getPrevCategoryName()"></span>
+                </button>
+
+                <!-- Category navigation - Down arrow -->
+                <button
+                    @click="nextCategory"
+                    class="opacity-80 hover:opacity-100 category-nav-button category-down nav-button"
+                    x-show="categories.length > 1"
+                    aria-label="Next category">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                    <span x-text="getNextCategoryName()"></span>
+                </button>
+
                 <!-- Image container -->
                 <div class="image-container">
                     <div class="relative flex justify-center items-center w-full h-full">
@@ -227,9 +313,14 @@
 
                     <!-- Title overlay -->
                     <div class="title-overlay">
-                        <a :href="currentItem?.link" target="_blank">
-                            <h2 x-text="currentItem?.title" class="font-semibold"></h2>
-                        </a>
+                        <div class="flex justify-between items-center">
+                            <a :href="currentItem?.link" target="_blank" class="flex-1">
+                                <h2 x-text="currentItem?.title" class="font-semibold"></h2>
+                            </a>
+                            <div x-show="selectedCategory" class="bg-black bg-opacity-50 ml-3 px-3 py-1 rounded-full text-sm">
+                                <span x-text="getCurrentCategoryName()"></span>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Progress bar -->
@@ -270,7 +361,7 @@
                 </div>
 
                 <!-- Pagination and controls -->
-                <div class="flex justify-between items-center text-sm control-bar">
+                <div class="flex justify-between items-center text-sm control-bar" x-show="!isFullscreen">
                     <a href="https://www.thisiscolossal.com" target="_blank"
                         class="hidden md:block justify-center font-bold text-center">This
                         is Colossal</a>
@@ -280,23 +371,9 @@
                             x-model="selectedCategory"
                             @change="loadCategory()"
                             class="bg-white dark:bg-dark-surface px-4 py-2 border-gray-300 border-unset dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-dark-text">
-                            <option value>All Posts</option>
-                            <option value="art">Art</option>
-                            <option value="craft">Craft</option>
-                            <option value="design">Design</option>
-                            <option value="photography">Photography</option>
-                            <option value="animation">Animation</option>
-                            <option value="books">Books</option>
-                            <option value="climate">Climate</option>
-                            <option value="film">Film</option>
-                            <option value="history">History</option>
-                            <option value="conversations">Conversations</option>
-                            <option value="illustration">Illustration</option>
-                            <option value="music">Music</option>
-                            <option value="nature">Nature</option>
-                            <option value="opportunities">Opportunities</option>
-                            <option value="science">Science</option>
-                            <option value="social-issues">Social Issues</option>
+                            <template x-for="category in categories" :key="category.id">
+                                <option :value="category.id" x-text="category.name"></option>
+                            </template>
                         </select>
                     </div>
                     <div class="flex justify-center items-center">
@@ -368,20 +445,139 @@
                 darkMode: true, // Default to dark mode
                 selectedCategory: "", // Store selected category
                 isFullscreen: false, // Track fullscreen state
+                exitBtnTimeout: null, // Store exit button timeout
+                buttonsTimeout: null, // Store buttons timeout
+                categories: [], // Store categories from API
+                categoryIndex: 0, // Current selected category index
+                inactivityTimer: null, // Store inactivity timer
 
                 get currentItem() {
                     return this.items[this.currentIndex] || null;
+                },
+
+                // Get previous category name
+                getPrevCategoryName() {
+                    if (this.categories.length <= 1) return '';
+
+                    const prevIndex = (this.categoryIndex - 1 + this.categories.length) % this.categories.length;
+                    return this.categories[prevIndex].name;
+                },
+
+                // Get next category name
+                getNextCategoryName() {
+                    if (this.categories.length <= 1) return '';
+
+                    const nextIndex = (this.categoryIndex + 1) % this.categories.length;
+                    return this.categories[nextIndex].name;
+                },
+
+                // Get current category name
+                getCurrentCategoryName() {
+                    if (!this.selectedCategory || this.categories.length === 0) return '';
+
+                    const category = this.categories.find(c => c.id === this.selectedCategory);
+                    return category ? category.name : '';
                 },
 
                 async init() {
                     // Apply dark mode on page load
                     this.applyTheme();
 
+                    // Fetch categories first
+                    await this.loadCategories();
+
+                    // Add keyboard event listeners
+                    document.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape' && this.isFullscreen) {
+                            this.exitFullscreen();
+                        } else if (e.key === 'ArrowLeft') {
+                            this.prevItem();
+                        } else if (e.key === 'ArrowRight') {
+                            this.nextItem();
+                        } else if (e.key === 'ArrowUp') {
+                            this.prevCategory();
+                        } else if (e.key === 'ArrowDown') {
+                            this.nextCategory();
+                        } else if (e.key === 'f' || e.key === 'F') {
+                            this.toggleFullscreen();
+                        }
+
+                        // Any key press resets inactivity timer
+                        this.resetInactivityTimer();
+                    });
+
+                    // Add touch event for mobile
+                    document.addEventListener('touchstart', () => {
+                        this.showControls();
+                        this.resetInactivityTimer();
+                    });
+
+                    // Track mouse movement
+                    document.addEventListener('mousemove', () => {
+                        const navButtons = document.querySelectorAll('.nav-button');
+                        navButtons.forEach(btn => {
+                            btn.classList.add('visible');
+                        });
+                        this.resetInactivityTimer();
+                    });
+
+                    // Track clicks
+                    document.addEventListener('click', () => {
+                        this.resetInactivityTimer();
+                    });
+
+                    // Add mouse events for desktop
+                    const imageContainer = document.querySelector('.gallery-image');
+                    if (imageContainer) {
+                        imageContainer.addEventListener('mouseenter', () => {
+                            this.showControls();
+                        });
+
+                        imageContainer.addEventListener('mouseleave', (e) => {
+                            // Check if we're moving to a navigation button
+                            // Get the element the mouse is moving to
+                            const relatedTarget = e.relatedTarget;
+                            if (relatedTarget &&
+                                (relatedTarget.classList.contains('category-nav-button') ||
+                                 relatedTarget.closest('.category-nav-button'))) {
+                                // Don't hide if moving to category button
+                                return;
+                            }
+
+                            this.hideControls();
+                        });
+                    }
+
+                    // Add event listeners to category buttons
+                    document.querySelectorAll('.category-nav-button').forEach(btn => {
+                        btn.addEventListener('mouseenter', () => {
+                            this.showControls();
+                        });
+
+                        btn.addEventListener('mouseleave', (e) => {
+                            // Only hide if not moving to another control
+                            const relatedTarget = e.relatedTarget;
+                            if (relatedTarget &&
+                                (relatedTarget.classList.contains('category-nav-button') ||
+                                 relatedTarget.classList.contains('nav-button') ||
+                                 relatedTarget.closest('.category-nav-button') ||
+                                 relatedTarget.closest('.nav-button') ||
+                                 relatedTarget.classList.contains('gallery-image'))) {
+                                // Don't hide if moving to another control or back to image
+                                return;
+                            }
+
+                            this.hideControls();
+                        });
+                    });
+
                     // Check for category parameter in URL
                     const urlParams = new URLSearchParams(window.location.search);
                     const categoryParam = urlParams.get('category');
                     if (categoryParam) {
                         this.selectedCategory = categoryParam;
+                        // Find the index of this category
+                        this.categoryIndex = Math.max(0, this.categories.findIndex(c => c.id === categoryParam));
                     }
 
                     // Check for interval parameter in URL
@@ -395,10 +591,52 @@
                     await this.loadCategory();
                 },
 
+                async loadCategories() {
+                    try {
+                        const response = await fetch('/api/categories');
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch categories');
+                        }
+                        this.categories = await response.json();
+                    } catch (err) {
+                        console.error('Error loading categories:', err);
+                        // Fallback to default categories if API fails
+                        this.categories = [
+                            { id: "", name: "All Posts" },
+                            { id: "art", name: "Art" },
+                            { id: "design", name: "Design" },
+                            { id: "photography", name: "Photography" }
+                        ];
+                    }
+                },
+
+                // Navigate to previous category
+                prevCategory() {
+                    if (this.categories.length === 0) return;
+
+                    this.categoryIndex = (this.categoryIndex - 1 + this.categories.length) % this.categories.length;
+                    this.selectedCategory = this.categories[this.categoryIndex].id;
+                    this.loadCategory();
+                },
+
+                // Navigate to next category
+                nextCategory() {
+                    if (this.categories.length === 0) return;
+
+                    this.categoryIndex = (this.categoryIndex + 1) % this.categories.length;
+                    this.selectedCategory = this.categories[this.categoryIndex].id;
+                    this.loadCategory();
+                },
+
                 async loadCategory() {
                     this.loading = true;
                     this.error = null;
                     this.stopAutoSlide();
+
+                    // Explicitly reset progress bar
+                    if (this.$refs.progressBar) {
+                        this.$refs.progressBar.style.width = '0%';
+                    }
 
                     // Update URL to reflect selected category
                     const url = new URL(window.location.href);
@@ -565,15 +803,74 @@
                             console.error('Failed to enter fullscreen mode:', err);
                         });
                     } else {
-                        // Exit fullscreen
-                        if (document.exitFullscreen) {
+                        this.exitFullscreen();
+                    }
+                },
+
+                exitFullscreen() {
+                    // Check if document is still in fullscreen before trying to exit
+                    if (document.fullscreenElement && document.exitFullscreen) {
+                        try {
                             document.exitFullscreen().then(() => {
                                 this.isFullscreen = false;
                             }).catch(err => {
                                 console.error('Failed to exit fullscreen mode:', err);
+                                // Reset the state even if there was an error
+                                this.isFullscreen = false;
                             });
+                        } catch (err) {
+                            console.error('Error exiting fullscreen:', err);
+                            // Reset the state
+                            this.isFullscreen = false;
                         }
+                    } else {
+                        // Already not in fullscreen
+                        this.isFullscreen = false;
                     }
+                },
+
+                showControls() {
+                    const exitBtn = document.querySelector('.exit-fullscreen-btn');
+                    const navButtons = document.querySelectorAll('.nav-button');
+
+                    console.log('showControls called, found buttons:', navButtons.length);
+
+                    // Show exit button if in fullscreen
+                    if (this.isFullscreen && exitBtn) {
+                        exitBtn.classList.add('visible');
+                    }
+
+                    // Show navigation buttons
+                    navButtons.forEach(btn => {
+                        btn.classList.add('visible');
+                    });
+
+                    this.resetInactivityTimer();
+                },
+
+                hideControls() {
+                    const exitBtn = document.querySelector('.exit-fullscreen-btn');
+                    const navButtons = document.querySelectorAll('.nav-button');
+
+                    if (exitBtn) {
+                        exitBtn.classList.remove('visible');
+                    }
+
+                    navButtons.forEach(btn => {
+                        btn.classList.remove('visible');
+                    });
+                },
+
+                resetInactivityTimer() {
+                    // Clear any existing timeout
+                    if (this.inactivityTimer) {
+                        clearTimeout(this.inactivityTimer);
+                    }
+
+                    // Set new timeout to hide controls after 1 seconds
+                    this.inactivityTimer = setTimeout(() => {
+                        this.hideControls();
+                    }, 1000);
                 }
             };
         }
