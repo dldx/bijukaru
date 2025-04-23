@@ -1,7 +1,7 @@
 [project]
 name = "colossal-gallery"
 version = "0.1.0"
-description = "Add your description here"
+description = "Simple carousel gallery for This is Colossal, suitable for embedding on other websites"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
