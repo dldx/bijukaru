@@ -53,7 +53,7 @@ async def read_root(request: Request, media_source: str = "colossal"):
 
 @app.get("/api/colossal/categories", response_model=List[Category])
 @cache(expire=3600)  # Cache for 1 hour
-async def get_categories():
+async def get_colossal_categories():
     # Return the list of categories
     categories = [
         Category(id="", name="All Posts"),
@@ -78,7 +78,7 @@ async def get_categories():
 
 @app.get("/api/colossal/feed", response_model=List[FeedItem])
 @cache(expire=600)  # Cache for 10 minutes (600 seconds)
-async def get_feed(category: Optional[str] = None):
+async def get_colossal_feed(category: Optional[str] = None):
     # Construct the feed URL based on the category
     if category:
         feed_url = f"https://www.thisiscolossal.com/category/{category}/feed/"
@@ -194,3 +194,14 @@ async def get_apod_feed(category: Optional[str] = None):
         ))
 
     return items
+
+@app.get("/api/media_sources")
+async def get_media_sources():
+    """Return a list of all available media sources."""
+    sources = []
+    for source_id, source_info in media_sources.items():
+        sources.append({
+            "id": source_id,
+            "name": source_info["media_source_name"]
+        })
+    return sources

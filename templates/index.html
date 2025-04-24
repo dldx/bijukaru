@@ -362,8 +362,17 @@
 
                 <!-- Pagination and controls -->
                 <div class="flex justify-between items-center text-sm control-bar" x-show="!hideToolbar">
-                    <a href="{{ media_source_url }}" target="_blank"
-                        class="hidden md:block justify-center font-bold text-center">{{ media_source_name }}</a>
+                    <div class="flex justify-center items-center media-source-selector">
+                        <select
+                            x-model="selectedMediaSource"
+                            @change="changeMediaSource()"
+                            class="bg-white dark:bg-dark-surface px-4 py-2 border-gray-300 border-unset dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-dark-text">
+                            <template x-for="source in mediaSources" :key="source.id">
+                                <option :value="source.id" x-text="source.name"
+                                :selected="source.id === selectedMediaSource"></option>
+                            </template>
+                        </select>
+                    </div>
                     <!-- Category selector -->
                     <div class="flex justify-center items-center category-selector">
                         <select
@@ -447,6 +456,10 @@
                 categories: [], // Store categories from API
                 categoryIndex: 0, // Current selected category index
                 inactivityTimer: null, // Store inactivity timer
+                prefetchedImages: new Set(), // Track which images have been prefetched
+                nToPrefetch: 2, // Number of images to prefetch
+                mediaSources: [], // Available media sources
+                selectedMediaSource: "{{ media_source }}", // Currently selected media source
 
                 get currentItem() {
                     return this.items[this.currentIndex] || null;
@@ -479,6 +492,9 @@
                 async init() {
                     // Apply dark mode on page load
                     this.applyTheme();
+
+                    // Fetch media sources
+                    await this.loadMediaSources();
 
                     // Fetch categories first
                     await this.loadCategories();
@@ -641,6 +657,7 @@
                     this.loading = true;
                     this.error = null;
                     this.stopAutoSlide();
+                    this.prefetchedImages.clear(); // Clear prefetched images tracking
 
                     // Explicitly reset progress bar
                     if (this.$refs.progressBar) {
@@ -691,6 +708,8 @@
                                 // Shuffle the items array
                                 this.shuffleArray(this.items);
                             }
+                            // Prefetch next images
+                            this.prefetchNextImages();
                             // Start auto-slideshow
                             this.startAutoSlide();
                         }
@@ -761,6 +780,8 @@
                 nextItem() {
                     this.direction = 'next';
                     this.currentIndex = (this.currentIndex + 1) % this.items.length;
+                    // Prefetch next images after changing the current image
+                    this.prefetchNextImages();
                     // Reset progress bar
                     if (this.$refs.progressBar) {
                         this.animateProgressBar();
@@ -775,6 +796,8 @@
                     this.stopAutoSlide();
                     this.direction = 'prev';
                     this.currentIndex = (this.currentIndex - 1 + this.items.length) % this.items.length;
+                    // Prefetch next images after changing the current image
+                    this.prefetchNextImages();
                     // Restart immediately
                     this.startAutoSlide();
                 },
@@ -804,6 +827,28 @@
                         };
 
                         this.progressAnimation = requestAnimationFrame(animate);
+                    }
+                },
+
+                prefetchNextImages() {
+                    if (!this.items.length) return;
+
+                    // Prefetch the next two images
+                    for (let i = 1; i <= this.nToPrefetch; i++) {
+                        const nextIndex = (this.currentIndex + i) % this.items.length;
+                        const nextItem = this.items[nextIndex];
+
+                        // Only prefetch if it has an image URL and hasn't been prefetched yet
+                        if (nextItem && nextItem.image_url && !this.prefetchedImages.has(nextItem.image_url)) {
+                            // Create a new image object to prefetch
+                            const img = new Image();
+                            img.src = nextItem.image_url;
+
+                            // Add to prefetched set
+                            this.prefetchedImages.add(nextItem.image_url);
+
+                            console.log('Prefetched image:', nextItem.image_url);
+                        }
                     }
                 },
 
@@ -909,6 +954,33 @@
                     this.inactivityTimer = setTimeout(() => {
                         this.hideControls();
                     }, 1000);
+                },
+
+                async loadMediaSources() {
+                    try {
+                        const response = await fetch('/api/media_sources');
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch media sources');
+                        }
+                        this.mediaSources = await response.json();
+                    } catch (err) {
+                        console.error('Error loading media sources:', err);
+                        // Fallback to default sources if API fails
+                        this.mediaSources = [
+                            { id: "colossal", name: "This is Colossal" },
+                            { id: "apod", name: "Astronomy Picture of the Day" }
+                        ];
+                    }
+                },
+
+                // Change media source
+                changeMediaSource() {
+                // get the URL parameters
+                const urlParams = new URLSearchParams(window.location.search);
+                // remove the category parameter
+                urlParams.delete('category');
+                // Navigate to the selected media source
+                window.location.href = "/" + this.selectedMediaSource + "?" + urlParams.toString();
                 }
             };
         }
