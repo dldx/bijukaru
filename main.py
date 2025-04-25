@@ -142,7 +142,7 @@ async def get_thisiscolossal_feed(category: Optional[str] = None):
 async def get_apod_categories():
     # Generate a list of years starting from current year down to 2015
     current_year = datetime.now().year
-    categories = [Category(id="", name="All")]
+    categories = []
 
     for year in range(current_year, 1995, -1):
         categories.append(Category(id=str(year), name=str(year)))

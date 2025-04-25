@@ -345,6 +345,14 @@
                                 <td>Open current image link</td>
                             </tr>
                             <tr>
+                                <td><span class="key">D</span></td>
+                                <td>Toggle image description</td>
+                            </tr>
+                            <tr>
+                                <td><span class="key">P</span></td>
+                                <td>Pause/resume slideshow</td>
+                            </tr>
+                            <tr>
                                 <td><span class="key">F</span></td>
                                 <td>Toggle fullscreen</td>
                             </tr>
@@ -355,10 +363,6 @@
                             <tr>
                                 <td><span class="key">H</span></td>
                                 <td>Toggle help (this screen)</td>
-                            </tr>
-                            <tr>
-                                <td><span class="key">D</span></td>
-                                <td>Toggle image description</td>
                             </tr>
                         </tbody>
                     </table>
@@ -502,6 +506,10 @@
                 <div
                     class="flex justify-between items-center text-sm control-bar"
                     x-show="!hideToolbar">
+
+                    <!-- Clustered selectors-->
+                    <div class="flex items-center space-x-2">
+                    <!-- Media source selector -->
                     <div
                         class="flex justify-center items-center media-source-selector">
                         <select
@@ -529,6 +537,7 @@
                             </template>
                         </select>
                     </div>
+                    </div>
                     <div class="flex justify-center items-center">
                         <span class="text-gray-600 dark:text-gray-400 text-sm">
                             <span x-text="currentIndex + 1"></span> of <span
@@ -536,59 +545,80 @@
                         </span>
                     </div>
 
-                    <!-- Fullscreen toggle button -->
-                    <button
-                        @click="toggleFullscreen"
-                        class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none text-gray-600 dark:text-gray-400"
-                        title="Toggle fullscreen">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
-                            fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-                        </svg>
-                    </button>
-
-                    <!-- Description toggle button -->
-                    <button
-                        @click="showDescription = !showDescription"
-                        class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none"
-                        :class="showDescription ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'"
-                        title="Toggle description">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
-                            fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
-                        </svg>
-                    </button>
-
-                    <div
-                        class="flex items-center space-x-2 scale-75 light-toggle">
-                        <span class="text-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg"
-                                class="w-5 h-5" fill="none" viewBox="0 0 24 24"
-                                stroke="currentColor">
-                                <path stroke-linecap="round"
-                                    stroke-linejoin="round" stroke-width="2"
-                                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    <!-- Clustered controls group -->
+                    <div class="flex items-center space-x-2">
+                        <!-- Pause/Resume button -->
+                        <button
+                            @click="togglePause"
+                            class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none"
+                            :class="isPaused ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'"
+                            title="Pause/Resume slideshow">
+                            <svg x-show="!isPaused" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2" d="M10 9v6m4-6v6" />
                             </svg>
-                        </span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" @click="toggleDarkMode"
-                                :checked="darkMode">
-                            <span class="toggle-slider"></span>
-                        </label>
-                        <span class="text-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg"
-                                class="w-5 h-5" fill="none" viewBox="0 0 24 24"
-                                stroke="currentColor">
-                                <path stroke-linecap="round"
-                                    stroke-linejoin="round" stroke-width="2"
-                                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                            <svg x-show="isPaused" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                             </svg>
-                        </span>
+                        </button>
+
+                        <!-- Fullscreen toggle button -->
+                        <button
+                            @click="toggleFullscreen"
+                            class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none text-gray-600 dark:text-gray-400"
+                            title="Toggle fullscreen">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+                                fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                            </svg>
+                        </button>
+
+                        <!-- Description toggle button -->
+                        <button
+                            @click="showDescription = !showDescription"
+                            class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none"
+                            :class="showDescription ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'"
+                            title="Toggle description">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+                                fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
+                            </svg>
+                        </button>
+
+                        <!-- Light/Dark mode toggle -->
+                        <div class="flex items-center space-x-2 scale-75">
+                            <span class="text-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg"
+                                    class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round"
+                                        stroke-linejoin="round" stroke-width="2"
+                                        d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                            </span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" @click="toggleDarkMode"
+                                    :checked="darkMode">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="text-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg"
+                                    class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round"
+                                        stroke-linejoin="round" stroke-width="2"
+                                        d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                                </svg>
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -609,6 +639,8 @@
                 currentIndex: 0,
                 autoSlideInterval: null,
                 slideInterval: 10000, // Time in milliseconds between slides
+                originalInterval: 10000, // Store original interval for pause/resume
+                isPaused: false, // Track pause state
                 direction: 'next', // Track direction of movement
                 darkMode: true, // Default to dark mode
                 selectedCategory: "", // Store selected category
@@ -660,9 +692,16 @@
 
                     // Preserve interval parameter if it's not default
                     if (this.slideInterval !== 10000) {
-                        url.searchParams.set('interval', this.slideInterval / 1000);
+                        url.searchParams.set('interval', this.originalInterval / 1000 || this.slideInterval / 1000);
                     } else if (url.searchParams.has('interval')) {
                         url.searchParams.delete('interval');
+                    }
+
+                    // Add paused parameter if paused
+                    if (this.isPaused) {
+                        url.searchParams.set('paused', 'true');
+                    } else if (url.searchParams.has('paused')) {
+                        url.searchParams.delete('paused');
                     }
 
                     // Preserve prefetch parameter if it's not default
@@ -763,6 +802,9 @@
                                 url.searchParams.delete('showDescription');
                             }
                             window.history.pushState({}, '', url);
+                        } else if (e.key === 'p' || e.key === 'P') {
+                            // Toggle pause/resume with 'p' key
+                            this.togglePause();
                         }
 
                         // Any key press resets inactivity timer
@@ -854,6 +896,15 @@
                         // Allow interval of 0 to disable auto-sliding
                         const parsedInterval = parseInt(intervalParam);
                         this.slideInterval = parsedInterval > 0 ? parsedInterval * 1000 : 0;
+                        this.originalInterval = this.slideInterval;
+                    }
+
+                    // Check for paused parameter
+                    const pausedParam = urlParams.get('paused');
+                    if (pausedParam === 'true' || pausedParam === '1') {
+                        this.isPaused = true;
+                        this.originalInterval = this.slideInterval;
+                        this.slideInterval = 0;
                     }
 
                     // Check for prefetch parameter
@@ -1307,6 +1358,24 @@
                     // Set new media source and navigate
                     this.selectedMediaSource = this.mediaSources[nextIndex].id;
                     this.changeMediaSource();
+                },
+
+                togglePause() {
+                    this.isPaused = !this.isPaused;
+
+                    if (this.isPaused) {
+                        // Store current interval and pause
+                        this.originalInterval = this.slideInterval;
+                        this.slideInterval = 0;
+                        this.stopAutoSlide();
+                    } else {
+                        // Restore original interval and resume
+                        this.slideInterval = this.originalInterval;
+                        this.startAutoSlide();
+                    }
+
+                    // Update URL
+                    this.updateURL();
                 }
             };
         }
