@@ -8,6 +8,9 @@
             content="A gallery of art from RSS feeds">
         <meta name="keywords" content="art, gallery, bijukaru, images, rss">
         <title>{{ media_source_name }} - Bijukaru</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Domine:wght@400..700&display=swap" rel="stylesheet">
         <!-- Tailwind CSS CDN -->
         <script src="https://cdn.tailwindcss.com"></script>
         <script>
@@ -218,6 +221,7 @@
         }
         /* Control bar at bottom */
         .control-bar {
+            font-family: 'Domine', serif;
             padding: 0.75rem;
             flex-shrink: 0;
             border-top: 1px solid rgba(0,0,0,0.1);
@@ -232,6 +236,7 @@
             border-top: 1px solid rgba(255,255,255,0.1);
         }
         .title-overlay {
+            font-family: 'Domine', serif;
             position: absolute;
             bottom: 0;
             left: 0;
@@ -436,7 +441,7 @@
                     <div class="title-overlay">
                         <div class="flex justify-between items-center">
                             <a :href="currentItem?.link" target="_blank"
-                                class="flex-1 hover:underline">
+                                class="flex-1 font-semibold hover:underline">
                                 <h2 x-text="currentItem?.title"
                                     class="font-semibold"></h2>
                             </a>
@@ -450,7 +455,7 @@
                             x-show="showDescription && currentItem?.description"
                             x-transition:enter="fade-enter-active"
                             x-transition:enter-start="fade-enter"
-                            class="relative max-h-[10vh] overflow-y-auto hide-scrollbar">
+                            class="relative max-h-[10vh] overflow-y-auto text-sm hide-scrollbar">
                             <div x-html="currentItem?.description"></div>
                         </div>
                     </div>
@@ -620,6 +625,7 @@
                 selectedMediaSource: "{{ media_source }}", // Currently selected media source
                 showHelp: false, // Track help overlay visibility
                 showDescription: false, // Track description overlay visibility
+                targetImageId: null, // Store target image ID
 
                 get currentItem() {
                     return this.items[this.currentIndex] || null;
@@ -632,6 +638,56 @@
                     } else {
                         document.title = `{{ media_source_name }} - Bijukaru`;
                     }
+                },
+
+                // Update URL with current parameters
+                updateURL() {
+                    const url = new URL(window.location.href);
+
+                    // Set current image ID if available
+                    if (this.currentItem && this.currentItem.id) {
+                        url.searchParams.set('image_id', this.currentItem.id);
+                    } else {
+                        url.searchParams.delete('image_id');
+                    }
+
+                    // Set category if selected
+                    if (this.selectedCategory) {
+                        url.searchParams.set('category', this.selectedCategory);
+                    } else {
+                        url.searchParams.delete('category');
+                    }
+
+                    // Preserve interval parameter if it's not default
+                    if (this.slideInterval !== 10000) {
+                        url.searchParams.set('interval', this.slideInterval / 1000);
+                    } else if (url.searchParams.has('interval')) {
+                        url.searchParams.delete('interval');
+                    }
+
+                    // Preserve prefetch parameter if it's not default
+                    if (this.nToPrefetch !== 2) {
+                        url.searchParams.set('prefetch', this.nToPrefetch);
+                    } else if (url.searchParams.has('prefetch')) {
+                        url.searchParams.delete('prefetch');
+                    }
+
+                    // Preserve fullscreen parameter if toolbar is hidden
+                    if (this.hideToolbar) {
+                        url.searchParams.set('fullscreen', 'true');
+                    } else if (url.searchParams.has('fullscreen')) {
+                        url.searchParams.delete('fullscreen');
+                    }
+
+                    // Preserve showDescription parameter
+                    if (this.showDescription) {
+                        url.searchParams.set('showDescription', 'true');
+                    } else if (url.searchParams.has('showDescription')) {
+                        url.searchParams.delete('showDescription');
+                    }
+
+                    // Update URL without reloading the page
+                    window.history.pushState({}, '', url);
                 },
 
                 // Get previous category name
@@ -789,6 +845,9 @@
                         this.categoryIndex = Math.max(0, this.categories.findIndex(c => c.id === categoryParam));
                     }
 
+                    // Check for image_id parameter (will be used after loading items)
+                    this.targetImageId = urlParams.get('image_id');
+
                     // Check for interval parameter
                     const intervalParam = urlParams.get('interval');
                     if (intervalParam && !isNaN(intervalParam)) {
@@ -866,40 +925,6 @@
                         this.$refs.progressBar.style.width = '0%';
                     }
 
-                    // Update URL to reflect selected category
-                    const url = new URL(window.location.href);
-                    if (this.selectedCategory) {
-                        url.searchParams.set('category', this.selectedCategory);
-                    } else {
-                        url.searchParams.delete('category');
-                    }
-
-                    // Preserve interval parameter if it exists
-                    if (this.slideInterval !== 10000) {
-                        url.searchParams.set('interval', this.slideInterval / 1000);
-                    }
-
-                    // Preserve prefetch parameter
-                    if (this.nToPrefetch !== 2) {
-                        url.searchParams.set('prefetch', this.nToPrefetch);
-                    }
-
-                    // Preserve fullscreen parameter if toolbar is hidden
-                    if (this.hideToolbar) {
-                        url.searchParams.set('fullscreen', 'true');
-                    } else if (url.searchParams.has('fullscreen')) {
-                        url.searchParams.delete('fullscreen');
-                    }
-
-                    // Preserve showDescription parameter
-                    if (this.showDescription) {
-                        url.searchParams.set('showDescription', 'true');
-                    } else if (url.searchParams.has('showDescription')) {
-                        url.searchParams.delete('showDescription');
-                    }
-
-                    window.history.pushState({}, '', url);
-
                     try {
                         // Construct URL with category parameter if selected
                         let apiUrl = '/api/{{ media_source }}/feed';
@@ -918,7 +943,18 @@
                         console.log('Items loaded:', this.items.length);
                         console.log('Items with descriptions:', this.items.filter(item => item.description).length);
 
+                        // Default to first image
                         this.currentIndex = 0;
+
+                        // If we have a target image ID, find and use it
+                        if (this.targetImageId && this.items.length > 0) {
+                            const targetIndex = this.items.findIndex(item => item.id === this.targetImageId);
+                            if (targetIndex !== -1) {
+                                this.currentIndex = targetIndex;
+                            }
+                            // Clear the target ID so we don't try to use it again
+                            this.targetImageId = null;
+                        }
 
                         if (this.items.length === 0) {
                             this.error = 'No images found in the feed';
@@ -929,6 +965,8 @@
                             }
                             // Update document title with initial image
                             this.updateDocumentTitle();
+                            // Update URL with initial image ID
+                            this.updateURL();
                             // Prefetch next images
                             this.prefetchNextImages();
                             // Start auto-slideshow
@@ -1008,6 +1046,8 @@
                     this.currentIndex = (this.currentIndex + 1) % this.items.length;
                     // Update document title
                     this.updateDocumentTitle();
+                    // Update URL with current image ID
+                    this.updateURL();
                     // Prefetch next images after changing the current image
                     this.prefetchNextImages();
                     // Reset progress bar
@@ -1026,6 +1066,8 @@
                     this.currentIndex = (this.currentIndex - 1 + this.items.length) % this.items.length;
                     // Update document title
                     this.updateDocumentTitle();
+                    // Update URL with current image ID
+                    this.updateURL();
                     // Prefetch next images after changing the current image
                     this.prefetchNextImages();
                     // Restart immediately
@@ -1137,14 +1179,8 @@
                 },
 
                 updateFullscreenURL() {
-                    // Update URL to reflect toolbar visibility
-                    const url = new URL(window.location.href);
-                    if (this.hideToolbar) {
-                        url.searchParams.set('fullscreen', 'true');
-                    } else if (url.searchParams.has('fullscreen')) {
-                        url.searchParams.delete('fullscreen');
-                    }
-                    window.history.pushState({}, '', url);
+                    // Update all URL parameters
+                    this.updateURL();
                 },
 
                 showControls() {
@@ -1210,9 +1246,15 @@
 
                 // Change media source
                 changeMediaSource() {
-                    // get the URL parameters
+                    // Get the URL parameters
                     const urlParams = new URLSearchParams(window.location.search);
-                    // remove the category parameter
+
+                    // Preserve current image ID if there is one
+                    if (this.currentItem && this.currentItem.id) {
+                        urlParams.set('image_id', this.currentItem.id);
+                    }
+
+                    // Remove the category parameter when changing sources
                     urlParams.delete('category');
 
                     // Preserve interval parameter if it exists

@@ -6,14 +6,14 @@ import httpx
 import xml.etree.ElementTree as ET
 import re
 from bs4 import BeautifulSoup
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 from typing import List, Optional
 from starlette.middleware.sessions import SessionMiddleware
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
-
+import hashlib
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
@@ -27,6 +27,7 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
 class FeedItem(BaseModel):
+    id: str
     title: str
     image_url: str
     link: str
@@ -102,6 +103,7 @@ async def get_thisiscolossal_feed(category: Optional[str] = None):
     for item in root.findall(".//item"):
         title = item.find("title").text if item.find("title") is not None else "No Title"
         link = item.find("link").text if item.find("link") is not None else "#"
+        slug = item.find("link").text.removesuffix("/").split("/")[-1]
 
         # Extract the content
         content_element = item.find(".//content:encoded", ns)
@@ -126,6 +128,7 @@ async def get_thisiscolossal_feed(category: Optional[str] = None):
         # Only add items that have images
         if image_url:
             items.append(FeedItem(
+                id=slug,
                 title=title,
                 image_url=image_url,
                 link=link,
@@ -181,12 +184,12 @@ async def get_apod_feed(category: Optional[str] = None):
         date_parts = item["date"].split("-")
         link = f"https://apod.nasa.gov/apod/ap{date_parts[0][2:]}{date_parts[1]}{date_parts[2]}.html"
 
-        # Truncate description if it's too long
         description = item.get("explanation", "")
 
         items.append(FeedItem(
+            id=item.get("date"),
             title=item.get("title", "No Title"),
-            image_url=item["url"],
+            image_url=item["hdurl"] if "hdurl" in item else item["url"],
             link=link,
             description=description
         ))
