@@ -18,6 +18,7 @@ This is a carousel gallery for art images, supporting multiple media sources inc
 - **Touch-Friendly Controls**: Optimized for mobile devices
 - **Fullscreen Support**: Toggle fullscreen viewing mode
 - **URL Parameters**: Configure via URL parameters (media source, category, interval, prefetch, fullscreen)
+- **Direct Image Links**: Link to specific images using image ID parameter
 - **Image Randomization**: Shuffled display for variety
 - **Original Content Links**: Each image links to its original article
 - **Error Handling**: Graceful handling of broken images
@@ -31,6 +32,7 @@ Visit [https://bijukaru.vercel.app](https://bijukaru.vercel.app) to see the gall
 ### URL Parameters
 
 - `category`: Filter by specific category (e.g., `?category=art`)
+- `image_id`: Display a specific image by ID (e.g., `?image_id=1234abcd`)
 - `interval`: Set custom slideshow timing in seconds (e.g., `?interval=5` for 5 seconds, `?interval=0` to disable auto-slideshow)
 - `prefetch`: Set number of images to preload (e.g., `?prefetch=5` to prefetch 5 upcoming images)
 - `fullscreen`: Start in fullscreen mode (e.g., `?fullscreen=true`)
@@ -56,7 +58,7 @@ To embed the gallery on your website, copy the following code and paste it into 
 For additional customization, you can use URL parameters:
 
 ```html
-<iframe src="https://bijukaru.vercel.app?category=photography&interval=8&prefetch=3&fullscreen=true&showDescription=true" width="100%" height="500px"></iframe>
+<iframe src="https://bijukaru.vercel.app?category=photography&interval=8&prefetch=3&image_id=1234abcd&fullscreen=true&showDescription=true" width="100%" height="500px"></iframe>
 ```
 
 ## Embedding in Obsidian
@@ -80,6 +82,14 @@ and copy the following code and paste it into the note where you want the galler
 ```
 ```custom-frames
 frame: Bijukaru
+style: background-color: unset; height: 800px;```
+```
+
+You can also link to specific images by adding URL parameters to the frame URL:
+```
+```custom-frames
+frame: Bijukaru
+url: https://bijukaru.vercel.app?image_id=1234abcd
 style: background-color: unset; height: 800px;```
 ```
 
