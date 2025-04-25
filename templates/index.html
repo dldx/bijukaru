@@ -354,6 +354,10 @@
                                 <td>Pause/resume slideshow</td>
                             </tr>
                             <tr>
+                                <td><span class="key">O</span></td>
+                                <td>Toggle HD images</td>
+                            </tr>
+                            <tr>
                                 <td><span class="key">F</span></td>
                                 <td>Toggle fullscreen</td>
                             </tr>
@@ -566,6 +570,16 @@
                             </svg>
                         </button>
 
+                        <!-- HD toggle button - only show if media source supports HD -->
+                        <button
+                            @click="toggleHD"
+                            x-show="{{ media_hd }}"
+                            class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none"
+                            :class="isHD ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'"
+                            title="Toggle HD images">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M3 3h18a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1m4.5 8.25V9H6v6h1.5v-2.25h2V15H11V9H9.5v2.25zm7-.75H16a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5h-1.5zM13 9v6h3a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2z"/></svg>
+                        </button>
+
                         <!-- Fullscreen toggle button -->
                         <button
                             @click="toggleFullscreen"
@@ -642,6 +656,7 @@
                 slideInterval: 10000, // Time in milliseconds between slides
                 originalInterval: 10000, // Store original interval for pause/resume
                 isPaused: false, // Track pause state
+                isHD: false, // Track HD state
                 direction: 'next', // Track direction of movement
                 darkMode: true, // Default to dark mode
                 selectedCategory: "", // Store selected category
@@ -659,6 +674,8 @@
                 showHelp: false, // Track help overlay visibility
                 showDescription: false, // Track description overlay visibility
                 targetImageId: null, // Store target image ID
+                prefetchDebounceTimer: null, // Timer for debouncing prefetch operations
+                prefetchDebounceDelay: 300, // Debounce delay in milliseconds
 
                 get currentItem() {
                     return this.items[this.currentIndex] || null;
@@ -703,6 +720,13 @@
                         url.searchParams.set('paused', 'true');
                     } else if (url.searchParams.has('paused')) {
                         url.searchParams.delete('paused');
+                    }
+
+                    // Add HD parameter if enabled
+                    if (this.isHD) {
+                        url.searchParams.set('hd', 'true');
+                    } else if (url.searchParams.has('hd')) {
+                        url.searchParams.delete('hd');
                     }
 
                     // Preserve prefetch parameter if it's not default
@@ -757,6 +781,9 @@
                 async init() {
                     // Apply dark mode on page load
                     this.applyTheme();
+
+                    // Check if HD is supported
+                    const hdSupported = document.querySelector('.main-container').dataset.hdSupported === 'true';
 
                     // Fetch media sources
                     await this.loadMediaSources();
@@ -908,6 +935,12 @@
                         this.slideInterval = 0;
                     }
 
+                    // Check for HD parameter
+                    const hdParam = urlParams.get('hd');
+                    if (hdParam === 'true' || hdParam === '1') {
+                        this.isHD = true;
+                    }
+
                     // Check for prefetch parameter
                     const prefetchParam = urlParams.get('prefetch');
                     if (prefetchParam && !isNaN(prefetchParam)) {
@@ -982,6 +1015,11 @@
                         let apiUrl = '/api/{{ media_source }}/feed';
                         if (this.selectedCategory) {
                             apiUrl += `?category=${this.selectedCategory}`;
+                        }
+
+                        // Add HD parameter if enabled
+                        if (this.isHD) {
+                            apiUrl += (apiUrl.includes('?') ? '&' : '?') + 'hd=true';
                         }
 
                         const response = await fetch(apiUrl);
@@ -1160,25 +1198,33 @@
                 },
 
                 prefetchNextImages() {
-                    if (!this.items.length) return;
-
-                    // Prefetch the next two images
-                    for (let i = 1; i <= this.nToPrefetch; i++) {
-                        const nextIndex = (this.currentIndex + i) % this.items.length;
-                        const nextItem = this.items[nextIndex];
-
-                        // Only prefetch if it has an image URL and hasn't been prefetched yet
-                        if (nextItem && nextItem.image_url && !this.prefetchedImages.has(nextItem.image_url)) {
-                            // Create a new image object to prefetch
-                            const img = new Image();
-                            img.src = nextItem.image_url;
-
-                            // Add to prefetched set
-                            this.prefetchedImages.add(nextItem.image_url);
-
-                            console.log('Prefetched image:', nextItem.image_url);
-                        }
+                    // Clear any existing debounce timer
+                    if (this.prefetchDebounceTimer) {
+                        clearTimeout(this.prefetchDebounceTimer);
                     }
+
+                    // Set a new debounce timer
+                    this.prefetchDebounceTimer = setTimeout(() => {
+                        if (!this.items.length) return;
+
+                        // Prefetch the next images
+                        for (let i = 1; i <= this.nToPrefetch; i++) {
+                            const nextIndex = (this.currentIndex + i) % this.items.length;
+                            const nextItem = this.items[nextIndex];
+
+                            // Only prefetch if it has an image URL and hasn't been prefetched yet
+                            if (nextItem && nextItem.image_url && !this.prefetchedImages.has(nextItem.image_url)) {
+                                // Create a new image object to prefetch
+                                const img = new Image();
+                                img.src = nextItem.image_url;
+
+                                // Add to prefetched set
+                                this.prefetchedImages.add(nextItem.image_url);
+
+                                console.log('Prefetched image:', nextItem.image_url);
+                            }
+                        }
+                    }, this.prefetchDebounceDelay);
                 },
 
                 handleImageError(event) {
@@ -1314,6 +1360,11 @@
                         urlParams.set('interval', this.slideInterval / 1000);
                     }
 
+                    // Preserve HD parameter if enabled
+                    if (this.isHD) {
+                        urlParams.set('hd', 'true');
+                    }
+
                     // Preserve prefetch parameter
                     if (this.nToPrefetch !== 2) {
                         urlParams.set('prefetch', this.nToPrefetch);
@@ -1374,6 +1425,17 @@
                         this.slideInterval = this.originalInterval;
                         this.startAutoSlide();
                     }
+
+                    // Update URL
+                    this.updateURL();
+                },
+
+                // Toggle HD images
+                toggleHD() {
+                    this.isHD = !this.isHD;
+
+                    // Reload the feed with HD parameter
+                    this.loadCategory();
 
                     // Update URL
                     this.updateURL();

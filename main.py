@@ -32,14 +32,18 @@ templates = Jinja2Templates(directory="templates")
 media_sources = {
     "thisiscolossal": {
         "media_source_name": "This is Colossal",
-        "media_source_url": "https://www.thisiscolossal.com"},
+        "media_source_url": "https://www.thisiscolossal.com",
+        "media_hd": "false"
+    },
     "apod": {
         "media_source_name": "Astronomy Picture of the Day",
-        "media_source_url": "https://apod.nasa.gov/apod/astropix.html"
+        "media_source_url": "https://apod.nasa.gov/apod/astropix.html",
+        "media_hd_option": "true"
     },
     "ukiyo-e": {
         "media_source_name": "Ukiyo-e",
-        "media_source_url": "https://ukiyo-e.org"
+        "media_source_url": "https://ukiyo-e.org",
+        "media_hd": "false"
     }
 }
 
@@ -147,7 +151,7 @@ async def get_apod_categories():
 
 @app.get("/api/apod/feed", response_model=List[FeedItem])
 @cache(expire=600)  # Cache for 10 minutes
-async def get_apod_feed(category: Optional[str] = None):
+async def get_apod_feed(category: Optional[str] = None, hd: bool = False):
     # Determine start_date based on category (which is a year)
     if category and category.isdigit():
         start_date = f"{category}-01-01"
@@ -185,7 +189,7 @@ async def get_apod_feed(category: Optional[str] = None):
         items.append(FeedItem(
             id=item.get("date"),
             title=item.get("title", "No Title"),
-            image_url=item["hdurl"] if "hdurl" in item else item["url"],
+            image_url=item["hdurl"] if ("hdurl" in item and hd) else item["url"],
             link=link,
             description=description
         ))
@@ -200,7 +204,11 @@ async def _get_ukiyo_e_categories():
 @app.get("/api/ukiyo-e/feed", response_model=List[FeedItem])
 @cache(expire=60 * 60 * 24)  # Cache for 1 day
 async def _get_ukiyo_e_feed(category: str = "met"):
-    return get_ukiyo_e_feed(category)
+    # Get multiple pages of data
+    items = []
+    for start in [1, 100, 200, 300]:
+        items.extend(get_ukiyo_e_feed(category, start))
+    return items
 
 
 @app.get("/api/media_sources")
