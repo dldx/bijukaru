@@ -1030,8 +1030,10 @@
                         this.items = await response.json();
 
                         // Log information about item descriptions
-                        console.log('Items loaded:', this.items.length);
-                        console.log('Items with descriptions:', this.items.filter(item => item.description).length);
+                        if ("{{ media_source }}" != 'apod') {
+                            // Shuffle the items array
+                            this.shuffleArray(this.items);
+                        }
 
                         // Default to first image
                         this.currentIndex = 0;
@@ -1049,10 +1051,6 @@
                         if (this.items.length === 0) {
                             this.error = 'No images found in the feed';
                         } else {
-                            if ("{{ media_source }}" != 'apod') {
-                                // Shuffle the items array
-                                this.shuffleArray(this.items);
-                            }
                             // Update document title with initial image
                             this.updateDocumentTitle();
                             // Update URL with initial image ID

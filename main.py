@@ -212,6 +212,7 @@ async def _get_ukiyo_e_feed(category: str = "met"):
 
 
 @app.get("/api/media_sources")
+@cache(expire=3600)
 async def get_media_sources():
     """Return a list of all available media sources."""
     sources = []
