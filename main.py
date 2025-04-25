@@ -18,7 +18,7 @@ from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
 
-FastAPICache.init(InMemoryBackend(), prefix="colossal-gallery")
+FastAPICache.init(InMemoryBackend(), prefix="bijukaru")
 
 app = FastAPI()
 
@@ -37,7 +37,7 @@ class Category(BaseModel):
     name: str
 
 media_sources = {
-    "colossal": {
+    "thisiscolossal": {
         "media_source_name": "This is Colossal",
         "media_source_url": "https://www.thisiscolossal.com"},
     "apod": {
@@ -48,12 +48,12 @@ media_sources = {
 
 @app.get("/{media_source}", response_class=HTMLResponse)
 @app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request, media_source: str = "colossal"):
+async def read_root(request: Request, media_source: str = "thisiscolossal"):
     return templates.TemplateResponse("index.html", {"request": request, "media_source": media_source, **media_sources[media_source]})
 
-@app.get("/api/colossal/categories", response_model=List[Category])
+@app.get("/api/thisiscolossal/categories", response_model=List[Category])
 @cache(expire=3600)  # Cache for 1 hour
-async def get_colossal_categories():
+async def get_thisiscolossal_categories():
     # Return the list of categories
     categories = [
         Category(id="", name="All Posts"),
@@ -76,9 +76,9 @@ async def get_colossal_categories():
     ]
     return categories
 
-@app.get("/api/colossal/feed", response_model=List[FeedItem])
+@app.get("/api/thisiscolossal/feed", response_model=List[FeedItem])
 @cache(expire=600)  # Cache for 10 minutes (600 seconds)
-async def get_colossal_feed(category: Optional[str] = None):
+async def get_thisiscolossal_feed(category: Optional[str] = None):
     # Construct the feed URL based on the category
     if category:
         feed_url = f"https://www.thisiscolossal.com/category/{category}/feed/"

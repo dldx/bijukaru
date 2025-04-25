@@ -1,7 +1,7 @@
 [project]
-name = "colossal-gallery"
+name = "bijukaru"
 version = "0.1.0"
-description = "Simple carousel gallery for This is Colossal, suitable for embedding on other websites"
+description = "Simple carousel gallery for art images, suitable for embedding on other websites"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

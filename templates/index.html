@@ -6,8 +6,8 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description"
             content="A gallery of art from RSS feeds">
-        <meta name="keywords" content="art, gallery, colossal, images, rss">
-        <title>{{ media_source }} Image carousel</title>
+        <meta name="keywords" content="art, gallery, bijukaru, images, rss">
+        <title>Bijukaru - {{ media_source }} Image carousel</title>
         <!-- Tailwind CSS CDN -->
         <script src="https://cdn.tailwindcss.com"></script>
         <script>
@@ -601,8 +601,16 @@
                     // Check for interval parameter
                     const intervalParam = urlParams.get('interval');
                     if (intervalParam && !isNaN(intervalParam)) {
-                        // Convert seconds to milliseconds and ensure it's at least 2 seconds
-                        this.slideInterval = Math.max(2, parseInt(intervalParam)) * 1000;
+                        // Allow interval of 0 to disable auto-sliding
+                        const parsedInterval = parseInt(intervalParam);
+                        this.slideInterval = parsedInterval > 0 ? parsedInterval * 1000 : 0;
+                    }
+
+                    // Check for prefetch parameter
+                    const prefetchParam = urlParams.get('prefetch');
+                    if (prefetchParam && !isNaN(prefetchParam)) {
+                        // Set the number of images to prefetch, with a reasonable limit
+                        this.nToPrefetch = Math.min(10, Math.max(0, parseInt(prefetchParam)));
                     }
 
                     // Load initial feed
@@ -628,9 +636,6 @@
                         // Fallback to default categories if API fails
                         this.categories = [
                             { id: "", name: "All Posts" },
-                            { id: "art", name: "Art" },
-                            { id: "design", name: "Design" },
-                            { id: "photography", name: "Photography" }
                         ];
                     }
                 },
@@ -675,6 +680,11 @@
                     // Preserve interval parameter if it exists
                     if (this.slideInterval !== 10000) {
                         url.searchParams.set('interval', this.slideInterval / 1000);
+                    }
+
+                    // Preserve prefetch parameter
+                    if (this.nToPrefetch !== 2) {
+                        url.searchParams.set('prefetch', this.nToPrefetch);
                     }
 
                     // Preserve fullscreen parameter if toolbar is hidden
@@ -756,6 +766,11 @@
                 },
 
                 startAutoSlide() {
+                    // Don't start auto-slide if interval is 0
+                    if (this.slideInterval === 0) {
+                        return;
+                    }
+
                     this.autoSlideInterval = setInterval(() => {
                         this.nextItem();
                     }, this.slideInterval);
@@ -806,6 +821,11 @@
                     // Reset progress bar
                     if (this.$refs.progressBar) {
                         this.$refs.progressBar.style.width = '0%';
+
+                        // If interval is 0, don't animate
+                        if (this.slideInterval === 0) {
+                            return;
+                        }
 
                         // Cancel any existing animation
                         if (this.progressAnimation) {
@@ -967,7 +987,7 @@
                         console.error('Error loading media sources:', err);
                         // Fallback to default sources if API fails
                         this.mediaSources = [
-                            { id: "colossal", name: "This is Colossal" },
+                            { id: "thisiscolossal", name: "This is Colossal" },
                             { id: "apod", name: "Astronomy Picture of the Day" }
                         ];
                     }
@@ -975,12 +995,28 @@
 
                 // Change media source
                 changeMediaSource() {
-                // get the URL parameters
-                const urlParams = new URLSearchParams(window.location.search);
-                // remove the category parameter
-                urlParams.delete('category');
-                // Navigate to the selected media source
-                window.location.href = "/" + this.selectedMediaSource + "?" + urlParams.toString();
+                    // get the URL parameters
+                    const urlParams = new URLSearchParams(window.location.search);
+                    // remove the category parameter
+                    urlParams.delete('category');
+
+                    // Preserve interval parameter if it exists
+                    if (this.slideInterval !== 10000) {
+                        urlParams.set('interval', this.slideInterval / 1000);
+                    }
+
+                    // Preserve prefetch parameter
+                    if (this.nToPrefetch !== 2) {
+                        urlParams.set('prefetch', this.nToPrefetch);
+                    }
+
+                    // Preserve fullscreen parameter if toolbar is hidden
+                    if (this.hideToolbar) {
+                        urlParams.set('fullscreen', 'true');
+                    }
+
+                    // Navigate to the selected media source
+                    window.location.href = "/" + this.selectedMediaSource + "?" + urlParams.toString();
                 }
             };
         }
