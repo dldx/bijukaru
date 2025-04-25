@@ -11,6 +11,8 @@ beautifulsoup4 = "*"
 jinja2 = "*"
 fastapi-cache2 = "*"
 itsdangerous = "*"
+requests = "*"
+orjson = "*"
 
 [dev-packages]
 

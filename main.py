@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 import re
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, computed_field
-from typing import List, Optional
+from typing import List, Literal, Optional
 from starlette.middleware.sessions import SessionMiddleware
 import json
 from collections.abc import AsyncIterator
@@ -17,6 +17,9 @@ import hashlib
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
+from ukiyoe import get_ukiyo_e_feed, get_ukiyo_e_categories
+
+from schema import FeedItem, Category
 
 FastAPICache.init(InMemoryBackend(), prefix="bijukaru")
 
@@ -26,17 +29,6 @@ app = FastAPI()
 # Set up templates
 templates = Jinja2Templates(directory="templates")
 
-class FeedItem(BaseModel):
-    id: str
-    title: str
-    image_url: str
-    link: str
-    description: Optional[str] = None
-
-class Category(BaseModel):
-    id: str
-    name: str
-
 media_sources = {
     "thisiscolossal": {
         "media_source_name": "This is Colossal",
@@ -44,12 +36,16 @@ media_sources = {
     "apod": {
         "media_source_name": "Astronomy Picture of the Day",
         "media_source_url": "https://apod.nasa.gov/apod/astropix.html"
+    },
+    "ukiyo-e": {
+        "media_source_name": "Ukiyo-e",
+        "media_source_url": "https://ukiyo-e.org"
     }
 }
 
 @app.get("/{media_source}", response_class=HTMLResponse)
 @app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request, media_source: str = "thisiscolossal"):
+async def read_root(request: Request, media_source: Literal["thisiscolossal", "apod", "ukiyo-e"] = "thisiscolossal"):
     return templates.TemplateResponse("index.html", {"request": request, "media_source": media_source, **media_sources[media_source]})
 
 @app.get("/api/thisiscolossal/categories", response_model=List[Category])
@@ -195,6 +191,17 @@ async def get_apod_feed(category: Optional[str] = None):
         ))
 
     return items
+
+@app.get("/api/ukiyo-e/categories", response_model=List[Category])
+@cache(expire=3600)  # Cache for 1 hour
+async def _get_ukiyo_e_categories():
+    return get_ukiyo_e_categories()
+
+@app.get("/api/ukiyo-e/feed", response_model=List[FeedItem])
+@cache(expire=60 * 60 * 24)  # Cache for 1 day
+async def _get_ukiyo_e_feed(category: str = "met"):
+    return get_ukiyo_e_feed(category)
+
 
 @app.get("/api/media_sources")
 async def get_media_sources():
