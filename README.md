@@ -14,6 +14,7 @@ This is a carousel gallery for art images, supporting multiple media sources inc
 - **Image Navigation**: Previous/next controls for manual browsing
 - **Category Navigation**: Up/down arrows to switch between categories
 - **Keyboard Shortcuts**: Navigation using arrow keys and 'f' for fullscreen
+- **Description Display**: Toggle visibility of image descriptions
 - **Touch-Friendly Controls**: Optimized for mobile devices
 - **Fullscreen Support**: Toggle fullscreen viewing mode
 - **URL Parameters**: Configure via URL parameters (media source, category, interval, prefetch, fullscreen)
@@ -33,12 +34,14 @@ Visit [https://bijukaru.vercel.app](https://bijukaru.vercel.app) to see the gall
 - `interval`: Set custom slideshow timing in seconds (e.g., `?interval=5` for 5 seconds, `?interval=0` to disable auto-slideshow)
 - `prefetch`: Set number of images to preload (e.g., `?prefetch=5` to prefetch 5 upcoming images)
 - `fullscreen`: Start in fullscreen mode (e.g., `?fullscreen=true`)
+- `showDescription`: Show image descriptions by default (e.g., `?showDescription=true`)
 
 ### Keyboard Navigation
 
 - **Left/Right Arrow Keys**: Navigate between images
 - **Up/Down Arrow Keys**: Navigate between categories
 - **F Key**: Toggle fullscreen mode
+- **D Key**: Toggle description visibility
 - **Escape Key**: Exit fullscreen mode
 - **Enter Key**: Open original article in new tab
 
@@ -53,7 +56,7 @@ To embed the gallery on your website, copy the following code and paste it into 
 For additional customization, you can use URL parameters:
 
 ```html
-<iframe src="https://bijukaru.vercel.app?category=photography&interval=8&prefetch=3&fullscreen=true" width="100%" height="500px"></iframe>
+<iframe src="https://bijukaru.vercel.app?category=photography&interval=8&prefetch=3&fullscreen=true&showDescription=true" width="100%" height="500px"></iframe>
 ```
 
 ## Embedding in Obsidian

@@ -121,7 +121,7 @@ async def get_thisiscolossal_feed(category: Optional[str] = None):
         if description_element is not None and description_element.text:
             # Clean HTML tags
             soup = BeautifulSoup(description_element.text, "html.parser")
-            description = soup.get_text()[:200] + "..." if len(soup.get_text()) > 200 else soup.get_text()
+            description = soup.get_text()
 
         # Only add items that have images
         if image_url:
@@ -183,8 +183,6 @@ async def get_apod_feed(category: Optional[str] = None):
 
         # Truncate description if it's too long
         description = item.get("explanation", "")
-        if len(description) > 200:
-            description = description[:200] + "..."
 
         items.append(FeedItem(
             title=item.get("title", "No Title"),

@@ -241,6 +241,13 @@
             color: white;
             z-index: 10;
         }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+    }
         /* Responsive adjustments */
         @media (max-width: 640px) {
             .control-bar {
@@ -297,9 +304,11 @@
             </div>
 
             <!-- Help Overlay -->
-            <div x-show="showHelp" class="help-overlay" @click="showHelp = false">
+            <div x-show="showHelp" class="help-overlay"
+                @click="showHelp = false">
                 <div class="help-content" @click.stop>
-                    <h2 class="mb-4 font-bold text-2xl text-center">Keyboard Shortcuts</h2>
+                    <h2 class="mb-4 font-bold text-2xl text-center">Keyboard
+                        Shortcuts</h2>
                     <table class="shortcuts-table">
                         <tbody>
                             <tr>
@@ -342,6 +351,10 @@
                                 <td><span class="key">H</span></td>
                                 <td>Toggle help (this screen)</td>
                             </tr>
+                            <tr>
+                                <td><span class="key">D</span></td>
+                                <td>Toggle image description</td>
+                            </tr>
                         </tbody>
                     </table>
 
@@ -365,8 +378,11 @@
                     @click="exitFullscreen"
                     class="exit-fullscreen-btn nav-button"
                     aria-label="Exit fullscreen">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" :class="{'hidden': !isFullscreen && !hideToolbar}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+                        :class="{'hidden': !isFullscreen && !hideToolbar}"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
 
@@ -376,8 +392,10 @@
                     class="opacity-80 hover:opacity-100 category-nav-button category-up nav-button"
                     x-show="categories.length > 1"
                     aria-label="Previous category">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            stroke-width="2" d="M5 15l7-7 7 7" />
                     </svg>
                     <span x-text="getPrevCategoryName()"></span>
                 </button>
@@ -388,15 +406,18 @@
                     class="opacity-80 hover:opacity-100 category-nav-button category-down nav-button"
                     x-show="categories.length > 1"
                     aria-label="Next category">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
                     <span x-text="getNextCategoryName()"></span>
                 </button>
 
                 <!-- Image container -->
                 <div class="image-container">
-                    <div class="relative flex justify-center items-center w-full h-full">
+                    <div
+                        class="relative flex justify-center items-center w-full h-full">
                         <img
                             x-show="currentItem"
                             :src="currentItem?.image_url"
@@ -414,12 +435,23 @@
                     <!-- Title overlay -->
                     <div class="title-overlay">
                         <div class="flex justify-between items-center">
-                            <a :href="currentItem?.link" target="_blank" class="flex-1 hover:underline">
-                                <h2 x-text="currentItem?.title" class="font-semibold"></h2>
+                            <a :href="currentItem?.link" target="_blank"
+                                class="flex-1 hover:underline">
+                                <h2 x-text="currentItem?.title"
+                                    class="font-semibold"></h2>
                             </a>
-                            <div x-show="selectedCategory" class="bg-black bg-opacity-50 ml-3 px-3 py-1 rounded-full text-sm">
+                            <div x-show="selectedCategory"
+                                class="bg-black bg-opacity-50 ml-3 px-3 py-1 rounded-full text-sm">
                                 <span x-text="getCurrentCategoryName()"></span>
                             </div>
+                        </div>
+                        <!-- Description overlay -->
+                        <div
+                            x-show="showDescription && currentItem?.description"
+                            x-transition:enter="fade-enter-active"
+                            x-transition:enter-start="fade-enter"
+                            class="relative max-h-[10vh] overflow-y-auto hide-scrollbar">
+                            <div x-html="currentItem?.description"></div>
                         </div>
                     </div>
 
@@ -445,7 +477,8 @@
                     </button>
                 </div>
 
-                <div class="top-1/2 right-4 absolute -translate-y-1/2 transform">
+                <div
+                    class="top-1/2 right-4 absolute -translate-y-1/2 transform">
                     <button
                         @click="nextItem"
                         class="bg-black bg-opacity-50 hover:bg-opacity-70 p-2 rounded-full focus:outline-none text-white nav-button"
@@ -461,26 +494,33 @@
                 </div>
 
                 <!-- Pagination and controls -->
-                <div class="flex justify-between items-center text-sm control-bar" x-show="!hideToolbar">
-                    <div class="flex justify-center items-center media-source-selector">
+                <div
+                    class="flex justify-between items-center text-sm control-bar"
+                    x-show="!hideToolbar">
+                    <div
+                        class="flex justify-center items-center media-source-selector">
                         <select
                             x-model="selectedMediaSource"
                             @change="changeMediaSource()"
                             class="bg-white dark:bg-dark-surface px-4 py-2 border-gray-300 border-unset dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-dark-text">
-                            <template x-for="source in mediaSources" :key="source.id">
+                            <template x-for="source in mediaSources"
+                                :key="source.id">
                                 <option :value="source.id" x-text="source.name"
-                                :selected="source.id === selectedMediaSource"></option>
+                                    :selected="source.id === selectedMediaSource"></option>
                             </template>
                         </select>
                     </div>
                     <!-- Category selector -->
-                    <div class="flex justify-center items-center category-selector">
+                    <div
+                        class="flex justify-center items-center category-selector">
                         <select
                             x-model="selectedCategory"
                             @change="loadCategory()"
                             class="bg-white dark:bg-dark-surface px-4 py-2 border-gray-300 border-unset dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-dark-text">
-                            <template x-for="category in categories" :key="category.id">
-                                <option :value="category.id" x-text="category.name"></option>
+                            <template x-for="category in categories"
+                                :key="category.id">
+                                <option :value="category.id"
+                                    x-text="category.name"></option>
                             </template>
                         </select>
                     </div>
@@ -496,8 +536,26 @@
                         @click="toggleFullscreen"
                         class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none text-gray-600 dark:text-gray-400"
                         title="Toggle fullscreen">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+                            fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                        </svg>
+                    </button>
+
+                    <!-- Description toggle button -->
+                    <button
+                        @click="showDescription = !showDescription"
+                        class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none"
+                        :class="showDescription ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'"
+                        title="Toggle description">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+                            fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
                         </svg>
                     </button>
 
@@ -561,6 +619,7 @@
                 mediaSources: [], // Available media sources
                 selectedMediaSource: "{{ media_source }}", // Currently selected media source
                 showHelp: false, // Track help overlay visibility
+                showDescription: false, // Track description overlay visibility
 
                 get currentItem() {
                     return this.items[this.currentIndex] || null;
@@ -635,6 +694,19 @@
                         } else if (e.key === 'h' || e.key === 'H') {
                             // Toggle help overlay
                             this.showHelp = !this.showHelp;
+                        } else if (e.key === 'd' || e.key === 'D') {
+                            // Toggle description overlay
+                            this.showDescription = !this.showDescription;
+                            console.log('Description visibility toggled:', this.showDescription);
+
+                            // Update URL when description is toggled
+                            const url = new URL(window.location.href);
+                            if (this.showDescription) {
+                                url.searchParams.set('showDescription', 'true');
+                            } else {
+                                url.searchParams.delete('showDescription');
+                            }
+                            window.history.pushState({}, '', url);
                         }
 
                         // Any key press resets inactivity timer
@@ -732,15 +804,21 @@
                         this.nToPrefetch = Math.min(10, Math.max(0, parseInt(prefetchParam)));
                     }
 
-                    // Load initial feed
-                    await this.loadCategory();
-
                     // Check for fullscreen parameter and set toolbar visibility if requested
                     const fullscreenParam = urlParams.get('fullscreen');
                     if (fullscreenParam === 'true' || fullscreenParam === '1') {
                         // Simply hide the toolbar without using native fullscreen
                         this.hideToolbar = true;
                     }
+
+                    // Check for showDescription parameter
+                    const showDescParam = urlParams.get('showDescription');
+                    if (showDescParam === 'true' || showDescParam === '1') {
+                        this.showDescription = true;
+                    }
+
+                    // Load initial feed
+                    await this.loadCategory();
                 },
 
                 async loadCategories() {
@@ -813,6 +891,13 @@
                         url.searchParams.delete('fullscreen');
                     }
 
+                    // Preserve showDescription parameter
+                    if (this.showDescription) {
+                        url.searchParams.set('showDescription', 'true');
+                    } else if (url.searchParams.has('showDescription')) {
+                        url.searchParams.delete('showDescription');
+                    }
+
                     window.history.pushState({}, '', url);
 
                     try {
@@ -828,6 +913,11 @@
                         }
 
                         this.items = await response.json();
+
+                        // Log information about item descriptions
+                        console.log('Items loaded:', this.items.length);
+                        console.log('Items with descriptions:', this.items.filter(item => item.description).length);
+
                         this.currentIndex = 0;
 
                         if (this.items.length === 0) {
@@ -1138,6 +1228,11 @@
                     // Preserve fullscreen parameter if toolbar is hidden
                     if (this.hideToolbar) {
                         urlParams.set('fullscreen', 'true');
+                    }
+
+                    // Preserve showDescription parameter
+                    if (this.showDescription) {
+                        urlParams.set('showDescription', 'true');
                     }
 
                     // Navigate to the selected media source
