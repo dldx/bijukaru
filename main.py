@@ -18,6 +18,7 @@ from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
 from ukiyoe import get_ukiyo_e_feed, get_ukiyo_e_categories
+from guardian_photos import get_guardian_categories, get_guardian_photos_feed
 
 from schema import FeedItem, Category
 
@@ -44,12 +45,17 @@ media_sources = {
         "media_source_name": "Ukiyo-e",
         "media_source_url": "https://ukiyo-e.org",
         "media_hd": "false"
+    },
+    "guardian": {
+        "media_source_name": "Guardian Photos",
+        "media_source_url": "https://www.theguardian.com",
+        "media_hd": "false"
     }
 }
 
 @app.get("/{media_source}", response_class=HTMLResponse)
 @app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request, media_source: Literal["thisiscolossal", "apod", "ukiyo-e"] = "thisiscolossal"):
+async def read_root(request: Request, media_source: Literal["thisiscolossal", "apod", "ukiyo-e", "guardian"] = "thisiscolossal"):
     return templates.TemplateResponse("index.html", {"request": request, "media_source": media_source, **media_sources[media_source]})
 
 @app.get("/api/thisiscolossal/categories", response_model=List[Category])
@@ -210,6 +216,15 @@ async def _get_ukiyo_e_feed(category: str = "met"):
         items.extend(get_ukiyo_e_feed(category, start))
     return items
 
+@app.get("/api/guardian/categories", response_model=List[Category])
+@cache(expire=3600)  # Cache for 1 hour
+async def _get_guardian_photos_categories():
+    return get_guardian_categories()
+
+@app.get("/api/guardian/feed", response_model=List[FeedItem])
+@cache(expire=60 * 60 * 24)  # Cache for 1 day
+async def _get_guardian_photos_feed(category:str):
+    return get_guardian_photos_feed(category.replace("__", "/"))
 
 @app.get("/api/media_sources")
 @cache(expire=3600)
