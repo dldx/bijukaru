@@ -223,7 +223,7 @@ async def _get_guardian_photos_categories():
 
 @app.get("/api/guardian/feed", response_model=List[FeedItem])
 @cache(expire=60 * 60 * 24)  # Cache for 1 day
-async def _get_guardian_photos_feed(category:str):
+async def _get_guardian_photos_feed(category: str = "news__gallery__2025__apr__25__black-grouse-courtship-and-first-pick-of-the-nfl-draft-photos-of-the-day-friday"):
     return get_guardian_photos_feed(category.replace("__", "/"))
 
 @app.get("/api/media_sources")
