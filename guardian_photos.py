@@ -8,7 +8,7 @@ def get_guardian_categories() -> list[Category]:
     url = "https://www.theguardian.com/news/series/ten-best-photographs-of-the-day/rss"
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
-    categories = []
+    categories = [Category(id="artanddesign__gallery__2022__feb__17__ansel-adams-rare-photographs-in-stunning-hi-definition", name="Ansel Adams: rare photographs in stunning hi-definition")]
     for item in soup.find_all("item"):
         categories.append(Category(id=item.find("guid").text.strip().removeprefix("https://www.theguardian.com/").replace("/", "__"), name=item.find("title").text.strip()))
     return categories
@@ -47,7 +47,7 @@ def get_guardian_photos_feed(category: str) -> list[FeedItem]:
     items = []
     # Put all the items together
     for i in range(len(images)):
-        items.append(FeedItem(id=links[i], title=titles[i], description=captions[i], image_url=images[i], link=links[i]))
+        items.append(FeedItem(id=links[i].split("#")[-1], title=titles[i], description=captions[i], image_url=images[i], link=links[i]))
     return items
 
 if __name__ == "__main__":

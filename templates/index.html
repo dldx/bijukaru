@@ -676,6 +676,7 @@
                 targetImageId: null, // Store target image ID
                 prefetchDebounceTimer: null, // Timer for debouncing prefetch operations
                 prefetchDebounceDelay: 300, // Debounce delay in milliseconds
+                wasPlayingBeforeTouch: false, // Track if slideshow was playing before touch
 
                 get currentItem() {
                     return this.items[this.currentIndex] || null;
@@ -878,6 +879,23 @@
                             }
 
                             this.hideControls();
+                        });
+
+                        // Add touch events for pausing slideshow while touching the image
+                        document.querySelector('.image-container').addEventListener('touchstart', () => {
+                            // Save current state before pausing
+                            if (!this.isPaused) {
+                                this.wasPlayingBeforeTouch = true;
+                                this.togglePause();
+                            }
+                        });
+
+                        document.querySelector('.image-container').addEventListener('touchend', () => {
+                            // Resume only if it was playing before touch
+                            if (this.wasPlayingBeforeTouch) {
+                                this.wasPlayingBeforeTouch = false;
+                                this.togglePause();
+                            }
                         });
                     }
 
