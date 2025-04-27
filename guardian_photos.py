@@ -8,9 +8,10 @@ def get_guardian_categories() -> list[Category]:
     url = "https://www.theguardian.com/news/series/ten-best-photographs-of-the-day/rss"
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
-    categories = [Category(id="artanddesign__gallery__2022__feb__17__ansel-adams-rare-photographs-in-stunning-hi-definition", name="Ansel Adams: rare photographs in stunning hi-definition")]
+    categories = []
     for item in soup.find_all("item"):
         categories.append(Category(id=item.find("guid").text.strip().removeprefix("https://www.theguardian.com/").replace("/", "__"), name=item.find("title").text.strip()))
+    categories += [Category(id="artanddesign__gallery__2022__feb__17__ansel-adams-rare-photographs-in-stunning-hi-definition", name="Ansel Adams: rare photographs in stunning hi-definition")]
     return categories
 
 

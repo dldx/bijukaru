@@ -223,7 +223,7 @@ async def _get_guardian_photos_categories():
 
 @app.get("/api/guardian/feed", response_model=List[FeedItem])
 @cache(expire=60 * 60 * 24)  # Cache for 1 day
-async def _get_guardian_photos_feed(category: str = "artanddesign__gallery__2022__feb__17__ansel-adams-rare-photographs-in-stunning-hi-definition"):
+async def _get_guardian_photos_feed(category: str = get_guardian_categories()[0].id):
     return get_guardian_photos_feed(category.replace("__", "/"))
 
 @app.get("/api/media_sources")
