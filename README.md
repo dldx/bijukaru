@@ -1,11 +1,11 @@
 # Bijukaru
 
-This is a carousel gallery for art images, supporting multiple media sources including [This is Colossal](https://www.thisiscolossal.com), [Astronomy Picture of the Day](https://apod.nasa.gov/apod/astropix.html), and [Ukiyo-e.org](https://ukiyo-e.org). It's suitable for embedding on other websites or in [Obsidian](https://obsidian.md).
+This is a carousel gallery for art images, supporting multiple media sources including [This is Colossal](https://www.thisiscolossal.com), [Astronomy Picture of the Day](https://apod.nasa.gov/apod/astropix.html), [Ukiyo-e.org](https://ukiyo-e.org), and [WikiArt](https://www.wikiart.org). It's suitable for embedding on other websites or in [Obsidian](https://obsidian.md).
 
 ## Features
 
-- **Multiple Media Sources**: Switch between different content providers (This is Colossal, Astronomy Picture of the Day, Ukiyo-e.org, Guardian, Reddit)
-- **Content Categories**: Filter gallery content by categories
+- **Multiple Media Sources**: Switch between different content providers (This is Colossal, Astronomy Picture of the Day, Ukiyo-e.org, Guardian, Reddit, WikiArt)
+- **Content Categories**: Filter gallery content by categories (including popular artists for WikiArt)
 - **Automatic Slideshow**: Images change automatically with a configurable interval (can be disabled)
 - **Visual Progress Bar**: Shows timing between slide transitions
 - **Image Prefetching**: Preloads upcoming images for smoother transitions
@@ -31,7 +31,7 @@ Visit [https://frames.dldx.org](https://frames.dldx.org) to see the gallery in a
 
 ### URL Parameters
 
-- `category`: Filter by specific category (e.g., `?category=art`)
+- `category`: Filter by specific category (e.g., `?category=art` or `?category=rene-magritte` for WikiArt artists)
 - `image_id`: Display a specific image by ID (e.g., `?image_id=1234abcd`)
 - `interval`: Set custom slideshow timing in seconds (e.g., `?interval=5` for 5 seconds, `?interval=0` to disable auto-slideshow)
 - `prefetch`: Set number of images to preload (e.g., `?prefetch=5` to prefetch 5 upcoming images)
@@ -65,6 +65,12 @@ You can also specify a particular media source:
 
 ```html
 <iframe src="https://frames.dldx.org/ukiyo-e?interval=10&fullscreen=true" width="100%" height="500px"></iframe>
+```
+
+Or browse WikiArt artists:
+
+```html
+<iframe src="https://frames.dldx.org/wikiart?category=edward-hopper" width="100%" height="500px"></iframe>
 ```
 
 ## Embedding in Obsidian
@@ -104,6 +110,14 @@ Or specify a particular media source:
 ```custom-frames
 frame: Bijukaru
 url: https://frames.dldx.org/ukiyo-e
+style: background-color: unset; height: 800px;```
+```
+
+Or browse WikiArt artists:
+```
+```custom-frames
+frame: Bijukaru
+url: https://frames.dldx.org/wikiart?category=frida-kahlo
 style: background-color: unset; height: 800px;```
 ```
 

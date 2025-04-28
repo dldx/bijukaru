@@ -19,6 +19,7 @@ from fastapi_cache.decorator import cache
 from ukiyoe import get_ukiyo_e_feed, get_ukiyo_e_categories
 from guardian_photos import get_guardian_categories, get_guardian_photos_feed
 from reddit import get_reddit_feed, get_reddit_categories
+from wikiart import get_wikiart_feed, get_wikiart_categories
 
 from schema import FeedItem, Category
 
@@ -31,37 +32,49 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
 media_sources = {
-    "thisiscolossal": {
-        "media_source_name": "This is Colossal",
-        "media_source_url": "https://www.thisiscolossal.com",
-        "media_hd": "false"
-    },
     "apod": {
         "media_source_name": "Astronomy Picture of the Day",
         "media_source_url": "https://apod.nasa.gov/apod/astropix.html",
-        "media_hd_option": "true"
+        "media_hd_option": "true",
     },
-    "ukiyo-e": {
-        "media_source_name": "Ukiyo-e",
-        "media_source_url": "https://ukiyo-e.org",
-        "media_hd": "false"
+    "thisiscolossal": {
+        "media_source_name": "This is Colossal",
+        "media_source_url": "https://www.thisiscolossal.com",
+        "media_hd": "false",
     },
     "guardian": {
         "media_source_name": "Guardian Photos",
         "media_source_url": "https://www.theguardian.com",
-        "media_hd": "false"
+        "media_hd": "false",
     },
     "reddit": {
         "media_source_name": "Reddit",
         "media_source_url": "https://www.reddit.com",
-        "media_hd": "true"
-    }
+        "media_hd": "true",
+    },
+    "ukiyo-e": {
+        "media_source_name": "Ukiyo-e",
+        "media_source_url": "https://ukiyo-e.org",
+        "media_hd": "false",
+    },
+    "wikiart": {
+        "media_source_name": "WikiArt",
+        "media_source_url": "https://www.wikiart.org",
+        "media_hd": "false",
+    },
 }
+
 
 @app.get("/{media_source}", response_class=HTMLResponse)
 @app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request, media_source: Literal["thisiscolossal", "apod", "ukiyo-e", "guardian", "reddit"] = "thisiscolossal"):
+async def read_root(
+    request: Request,
+    media_source: Literal[
+        "thisiscolossal", "apod", "ukiyo-e", "guardian", "reddit", "wikiart"
+    ] = "thisiscolossal",
+):
     return templates.TemplateResponse("index.html", {"request": request, "media_source": media_source, **media_sources[media_source]})
+
 
 @app.get("/api/thisiscolossal/categories", response_model=List[Category])
 @cache(expire=3600)  # Cache for 1 hour
@@ -240,6 +253,19 @@ async def _get_reddit_categories():
 @cache(expire=60 * 60 * 24)  # Cache for 1 day
 async def _get_reddit_feed(category: str = get_reddit_categories()[0].id, hd: bool = False):
     return get_reddit_feed(category, hd)
+
+
+@app.get("/api/wikiart/categories", response_model=List[Category])
+@cache(expire=3600)  # Cache for 1 hour
+async def _get_wikiart_categories():
+    return get_wikiart_categories()
+
+
+@app.get("/api/wikiart/feed", response_model=List[FeedItem])
+@cache(expire=60 * 60 * 24)  # Cache for 1 day
+async def _get_wikiart_feed(category: str = "ansel-adams", hd: bool = False):
+    return get_wikiart_feed(category, hd)
+
 
 @app.get("/api/media_sources")
 @cache(expire=3600)
