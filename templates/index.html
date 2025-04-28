@@ -882,7 +882,7 @@
                         });
 
                         // Add touch events for pausing slideshow while touching the image
-                        document.querySelector('.image-container').addEventListener('touchstart', () => {
+                        document.querySelector('.gallery-image').addEventListener('touchstart', () => {
                             // Save current state before pausing
                             if (!this.isPaused) {
                                 this.wasPlayingBeforeTouch = true;
@@ -890,7 +890,7 @@
                             }
                         });
 
-                        document.querySelector('.image-container').addEventListener('touchend', () => {
+                        document.querySelector('.gallery-image').addEventListener('touchend', () => {
                             // Resume only if it was playing before touch
                             if (this.wasPlayingBeforeTouch) {
                                 this.wasPlayingBeforeTouch = false;
