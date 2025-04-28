@@ -792,6 +792,71 @@
                     // Fetch categories first
                     await this.loadCategories();
 
+                    // Check for URL parameters
+                    const urlParams = new URLSearchParams(window.location.search);
+
+                    // Check for category parameter
+                    const categoryParam = urlParams.get('category');
+                    if (categoryParam) {
+                        this.selectedCategory = categoryParam;
+                        // Find the index of this category
+                        this.categoryIndex = Math.max(0, this.categories.findIndex(c => c.id === categoryParam));
+                    } else if (this.categories.length > 0 && this.categories[0].id) {
+                        // If no category in URL but we have categories, use the first one
+                        this.selectedCategory = this.categories[0].id;
+                        this.categoryIndex = 0;
+                        // Update URL to include the category
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('category', this.selectedCategory);
+                        window.history.replaceState({}, '', url);
+                    }
+
+                    // Check for image_id parameter (will be used after loading items)
+                    this.targetImageId = urlParams.get('image_id');
+
+                    // Check for interval parameter
+                    const intervalParam = urlParams.get('interval');
+                    if (intervalParam && !isNaN(intervalParam)) {
+                        // Allow interval of 0 to disable auto-sliding
+                        const parsedInterval = parseInt(intervalParam);
+                        this.slideInterval = parsedInterval > 0 ? parsedInterval * 1000 : 0;
+                        this.originalInterval = this.slideInterval;
+                    }
+
+                    // Check for paused parameter
+                    const pausedParam = urlParams.get('paused');
+                    if (pausedParam === 'true' || pausedParam === '1') {
+                        this.isPaused = true;
+                        this.originalInterval = this.slideInterval;
+                        this.slideInterval = 0;
+                    }
+
+                    // Check for HD parameter
+                    const hdParam = urlParams.get('hd');
+                    if (hdParam === 'true' || hdParam === '1') {
+                        this.isHD = true;
+                    }
+
+                    // Check for prefetch parameter
+                    const prefetchParam = urlParams.get('prefetch');
+                    if (prefetchParam && !isNaN(prefetchParam)) {
+                        // Set the number of images to prefetch, with a reasonable limit
+                        this.nToPrefetch = Math.min(10, Math.max(0, parseInt(prefetchParam)));
+                    }
+
+                    // Check for fullscreen parameter and set toolbar visibility if requested
+                    const fullscreenParam = urlParams.get('fullscreen');
+                    if (fullscreenParam === 'true' || fullscreenParam === '1') {
+                        // Simply hide the toolbar without using native fullscreen
+                        this.hideToolbar = true;
+                    }
+
+                    // Check for showDescription parameter
+                    const showDescParam = urlParams.get('showDescription');
+                    if (showDescParam === 'true' || showDescParam === '1') {
+                        this.showDescription = true;
+                    }
+
                     // Add keyboard event listeners
                     document.addEventListener('keydown', (e) => {
                         if (e.key === 'Escape' && this.isFullscreen) {
@@ -922,63 +987,6 @@
                         });
                     });
 
-                    // Check for URL parameters
-                    const urlParams = new URLSearchParams(window.location.search);
-
-                    // Check for category parameter
-                    const categoryParam = urlParams.get('category');
-                    if (categoryParam) {
-                        this.selectedCategory = categoryParam;
-                        // Find the index of this category
-                        this.categoryIndex = Math.max(0, this.categories.findIndex(c => c.id === categoryParam));
-                    }
-
-                    // Check for image_id parameter (will be used after loading items)
-                    this.targetImageId = urlParams.get('image_id');
-
-                    // Check for interval parameter
-                    const intervalParam = urlParams.get('interval');
-                    if (intervalParam && !isNaN(intervalParam)) {
-                        // Allow interval of 0 to disable auto-sliding
-                        const parsedInterval = parseInt(intervalParam);
-                        this.slideInterval = parsedInterval > 0 ? parsedInterval * 1000 : 0;
-                        this.originalInterval = this.slideInterval;
-                    }
-
-                    // Check for paused parameter
-                    const pausedParam = urlParams.get('paused');
-                    if (pausedParam === 'true' || pausedParam === '1') {
-                        this.isPaused = true;
-                        this.originalInterval = this.slideInterval;
-                        this.slideInterval = 0;
-                    }
-
-                    // Check for HD parameter
-                    const hdParam = urlParams.get('hd');
-                    if (hdParam === 'true' || hdParam === '1') {
-                        this.isHD = true;
-                    }
-
-                    // Check for prefetch parameter
-                    const prefetchParam = urlParams.get('prefetch');
-                    if (prefetchParam && !isNaN(prefetchParam)) {
-                        // Set the number of images to prefetch, with a reasonable limit
-                        this.nToPrefetch = Math.min(10, Math.max(0, parseInt(prefetchParam)));
-                    }
-
-                    // Check for fullscreen parameter and set toolbar visibility if requested
-                    const fullscreenParam = urlParams.get('fullscreen');
-                    if (fullscreenParam === 'true' || fullscreenParam === '1') {
-                        // Simply hide the toolbar without using native fullscreen
-                        this.hideToolbar = true;
-                    }
-
-                    // Check for showDescription parameter
-                    const showDescParam = urlParams.get('showDescription');
-                    if (showDescParam === 'true' || showDescParam === '1') {
-                        this.showDescription = true;
-                    }
-
                     // Load initial feed
                     await this.loadCategory();
                 },
@@ -1048,7 +1056,7 @@
                         this.items = await response.json();
 
                         // Log information about item descriptions
-                        if ("{{ media_source }}" != 'apod') {
+                        if (!["apod", "reddit"].includes("{{ media_source }}")) {
                             // Shuffle the items array
                             this.shuffleArray(this.items);
                         }
@@ -1448,10 +1456,24 @@
 
                 // Toggle HD images
                 toggleHD() {
+                    // Store current image ID before toggling
+                    const currentImageId = this.currentItem?.id;
+
                     this.isHD = !this.isHD;
 
                     // Reload the feed with HD parameter
-                    this.loadCategory();
+                    this.loadCategory().then(() => {
+                        // After reloading, try to find the same image
+                        if (currentImageId) {
+                            const newIndex = this.items.findIndex(item => item.id === currentImageId);
+                            if (newIndex !== -1) {
+                                this.currentIndex = newIndex;
+                                // Update document title and URL
+                                this.updateDocumentTitle();
+                                this.updateURL();
+                            }
+                        }
+                    });
 
                     // Update URL
                     this.updateURL();

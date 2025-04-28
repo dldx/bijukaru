@@ -19,6 +19,7 @@ from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
 from ukiyoe import get_ukiyo_e_feed, get_ukiyo_e_categories
 from guardian_photos import get_guardian_categories, get_guardian_photos_feed
+from reddit import get_reddit_feed, get_reddit_categories
 
 from schema import FeedItem, Category
 
@@ -50,12 +51,17 @@ media_sources = {
         "media_source_name": "Guardian Photos",
         "media_source_url": "https://www.theguardian.com",
         "media_hd": "false"
+    },
+    "reddit": {
+        "media_source_name": "Reddit",
+        "media_source_url": "https://www.reddit.com",
+        "media_hd": "true"
     }
 }
 
 @app.get("/{media_source}", response_class=HTMLResponse)
 @app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request, media_source: Literal["thisiscolossal", "apod", "ukiyo-e", "guardian"] = "thisiscolossal"):
+async def read_root(request: Request, media_source: Literal["thisiscolossal", "apod", "ukiyo-e", "guardian", "reddit"] = "thisiscolossal"):
     return templates.TemplateResponse("index.html", {"request": request, "media_source": media_source, **media_sources[media_source]})
 
 @app.get("/api/thisiscolossal/categories", response_model=List[Category])
@@ -225,6 +231,16 @@ async def _get_guardian_photos_categories():
 @cache(expire=60 * 60 * 24)  # Cache for 1 day
 async def _get_guardian_photos_feed(category: str = get_guardian_categories()[0].id):
     return get_guardian_photos_feed(category.replace("__", "/"))
+
+@app.get("/api/reddit/categories", response_model=List[Category])
+@cache(expire=3600)  # Cache for 1 hour
+async def _get_reddit_categories():
+    return get_reddit_categories()
+
+@app.get("/api/reddit/feed", response_model=List[FeedItem])
+@cache(expire=60 * 60 * 24)  # Cache for 1 day
+async def _get_reddit_feed(category: str = get_reddit_categories()[0].id, hd: bool = False):
+    return get_reddit_feed(category, hd)
 
 @app.get("/api/media_sources")
 @cache(expire=3600)
