@@ -13,6 +13,10 @@ def get_reddit_categories() -> list[Category]:
             Category(id="wildlifephotography", name="r/WildlifePhotography"),
             Category(id="streetphotography", name="r/StreetPhotography"),
             Category(id="astrophotography", name="r/Astrophotography"),
+            Category(id="MoviePosterPorn", name="r/MoviePosterPorn"),
+            Category(id="wallpapers", name="r/Wallpapers"),
+            Category(id="minimalistphotography", name="r/MinimalistPhotography"),
+            Category(id="blackandwhite", name="r/BlackAndWhite"),
         ],
         key=lambda x: x.name,
     )

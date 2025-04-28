@@ -4,7 +4,7 @@ This is a carousel gallery for art images, supporting multiple media sources inc
 
 ## Features
 
-- **Multiple Media Sources**: Switch between different content providers (This is Colossal, Astronomy Picture of the Day, Ukiyo-e.org)
+- **Multiple Media Sources**: Switch between different content providers (This is Colossal, Astronomy Picture of the Day, Ukiyo-e.org, Guardian, Reddit)
 - **Content Categories**: Filter gallery content by categories
 - **Automatic Slideshow**: Images change automatically with a configurable interval (can be disabled)
 - **Visual Progress Bar**: Shows timing between slide transitions
@@ -27,7 +27,7 @@ This is a carousel gallery for art images, supporting multiple media sources inc
 
 ## Usage
 
-Visit [https://bijukaru.vercel.app](https://bijukaru.vercel.app) to see the gallery in action.
+Visit [https://frames.dldx.org](https://frames.dldx.org) to see the gallery in action.
 
 ### URL Parameters
 
@@ -52,26 +52,26 @@ Visit [https://bijukaru.vercel.app](https://bijukaru.vercel.app) to see the gall
 To embed the gallery on your website, copy the following code and paste it into the HTML body of your page:
 
 ```html
-<iframe src="https://bijukaru.vercel.app" width="100%" height="500px"></iframe>
+<iframe src="https://frames.dldx.org" width="100%" height="500px"></iframe>
 ```
 
 For additional customization, you can use URL parameters:
 
 ```html
-<iframe src="https://bijukaru.vercel.app?category=photography&interval=8&prefetch=3&image_id=1234abcd&fullscreen=true&showDescription=true" width="100%" height="500px"></iframe>
+<iframe src="https://frames.dldx.org?category=photography&interval=8&prefetch=3&image_id=1234abcd&fullscreen=true&showDescription=true" width="100%" height="500px"></iframe>
 ```
 
 You can also specify a particular media source:
 
 ```html
-<iframe src="https://bijukaru.vercel.app/ukiyo-e?interval=10&fullscreen=true" width="100%" height="500px"></iframe>
+<iframe src="https://frames.dldx.org/ukiyo-e?interval=10&fullscreen=true" width="100%" height="500px"></iframe>
 ```
 
 ## Embedding in Obsidian
 
 To embed the gallery in Obsidian, install [Custom Frames](https://github.com/Ellpeck/ObsidianCustomFrames), add a new frame called "Bijukaru" with the following settings:
 
-**URL**: https://bijukaru.vercel.app
+**URL**: https://frames.dldx.org
 
 **Additional CSS**:
 ```css
@@ -95,7 +95,7 @@ You can also link to specific images by adding URL parameters to the frame URL:
 ```
 ```custom-frames
 frame: Bijukaru
-url: https://bijukaru.vercel.app?image_id=1234abcd
+url: https://frames.dldx.org?image_id=1234abcd
 style: background-color: unset; height: 800px;```
 ```
 
@@ -103,7 +103,7 @@ Or specify a particular media source:
 ```
 ```custom-frames
 frame: Bijukaru
-url: https://bijukaru.vercel.app/ukiyo-e
+url: https://frames.dldx.org/ukiyo-e
 style: background-color: unset; height: 800px;```
 ```
 
