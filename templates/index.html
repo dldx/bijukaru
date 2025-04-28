@@ -79,6 +79,7 @@
             max-height: 100%;
             max-width: 100%;
             object-fit: contain;
+            position: relative;
         }
         /* Help overlay */
         .help-overlay {
@@ -292,10 +293,61 @@
             visibility: visible;
         }
         .category-up {
-            top: 15vh;
+            top: 15%;
         }
         .category-down {
-            bottom: 15vh;
+            bottom: 15%;
+        }
+        /* Image navigation buttons */
+        .image-nav-button {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 0.5rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .image-nav-button.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .image-nav-prev {
+            left: 10px;
+        }
+        .image-nav-next {
+            right: 10px;
+        }
+        /* Mobile navigation areas */
+        .mobile-nav-area {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 25%;
+            z-index: 10;
+            display: none;
+        }
+        .mobile-nav-prev {
+            left: 0;
+        }
+        .mobile-nav-next {
+            right: 0;
+        }
+        @media (max-width: 640px) {
+            .mobile-nav-area {
+                display: block;
+            }
+            /* Hide the navigation buttons on mobile since we have the touch areas */
+            .image-nav-button {
+                display: none;
+            }
         }
     </style>
     </head>
@@ -395,34 +447,6 @@
                     </svg>
                 </button>
 
-                <!-- Category navigation - Up arrow -->
-                <button
-                    @click="prevCategory"
-                    class="opacity-80 hover:opacity-100 category-nav-button category-up nav-button"
-                    x-show="categories.length > 1"
-                    aria-label="Previous category">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            stroke-width="2" d="M5 15l7-7 7 7" />
-                    </svg>
-                    <span x-text="getPrevCategoryName()"></span>
-                </button>
-
-                <!-- Category navigation - Down arrow -->
-                <button
-                    @click="nextCategory"
-                    class="opacity-80 hover:opacity-100 category-nav-button category-down nav-button"
-                    x-show="categories.length > 1"
-                    aria-label="Next category">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                    <span x-text="getNextCategoryName()"></span>
-                </button>
-
                 <!-- Image container -->
                 <div class="image-container">
                     <div
@@ -439,18 +463,78 @@
                             x-transition:enter-start="fade-enter"
                             x-transition:leave="fade-leave-active"
                             x-transition:leave-end="fade-leave-to">
+
+                        <!-- Mobile navigation areas -->
+                        <div class="mobile-nav-area mobile-nav-prev" @click="prevItem"></div>
+                        <div class="mobile-nav-area mobile-nav-next" @click="nextItem"></div>
+
+                        <!-- Previous image button -->
+                        <button
+                            @click="prevItem"
+                            class="image-nav-button image-nav-prev nav-button"
+                            aria-label="Previous image">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="w-6 h-6" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round" stroke-width="2"
+                                    d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+
+                        <!-- Next image button -->
+                        <button
+                            @click="nextItem"
+                            class="image-nav-button image-nav-next nav-button"
+                            aria-label="Next image">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="w-6 h-6" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round" stroke-width="2"
+                                    d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+
+                        <!-- Category navigation - Up arrow -->
+                        <button
+                            @click="prevCategory"
+                            class="opacity-80 hover:opacity-100 category-nav-button category-up nav-button"
+                            x-show="categories.length > 1"
+                            aria-label="Previous category">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2" d="M5 15l7-7 7 7" />
+                            </svg>
+                            <span x-text="getPrevCategoryName()"></span>
+                        </button>
+
+                        <!-- Category navigation - Down arrow -->
+                        <button
+                            @click="nextCategory"
+                            class="opacity-80 hover:opacity-100 category-nav-button category-down nav-button"
+                            x-show="categories.length > 1"
+                            aria-label="Next category">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                            <span x-text="getNextCategoryName()"></span>
+                        </button>
                     </div>
 
                     <!-- Title overlay -->
                     <div class="title-overlay">
-                        <div class="flex justify-between items-center">
+                        <div class="flex flex-row justify-between items-center">
                             <a :href="currentItem?.link" target="_blank"
-                                class="flex-1 font-semibold hover:underline">
+                                class="flex-1 font-semibold hover:underline basis-2/3">
                                 <h2 x-text="currentItem?.title"
                                     class="font-semibold"></h2>
                             </a>
                             <div x-show="selectedCategory"
-                                class="bg-black bg-opacity-50 ml-3 px-3 py-1 rounded-full text-sm">
+                                class="bg-black bg-opacity-50 ml-3 px-3 py-1 rounded-full text-sm basis-1/3">
                                 <span x-text="getCurrentCategoryName()"></span>
                             </div>
                         </div>
@@ -468,38 +552,6 @@
                     <div class="progress-container">
                         <div class="progress-bar" x-ref="progressBar"></div>
                     </div>
-                </div>
-
-                <!-- Navigation buttons -->
-                <div class="top-1/2 left-4 absolute -translate-y-1/2 transform">
-                    <button
-                        @click="prevItem"
-                        class="bg-black bg-opacity-50 hover:bg-opacity-70 p-2 rounded-full focus:outline-none text-white nav-button"
-                        aria-label="Previous image">
-                        <svg xmlns="http://www.w3.org/2000/svg"
-                            class="w-6 h-6" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path stroke-linecap="round"
-                                stroke-linejoin="round" stroke-width="2"
-                                d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
-                </div>
-
-                <div
-                    class="top-1/2 right-4 absolute -translate-y-1/2 transform">
-                    <button
-                        @click="nextItem"
-                        class="bg-black bg-opacity-50 hover:bg-opacity-70 p-2 rounded-full focus:outline-none text-white nav-button"
-                        aria-label="Next image">
-                        <svg xmlns="http://www.w3.org/2000/svg"
-                            class="w-6 h-6" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path stroke-linecap="round"
-                                stroke-linejoin="round" stroke-width="2"
-                                d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
                 </div>
 
                 <!-- Pagination and controls -->
