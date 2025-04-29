@@ -1,21 +1,41 @@
 from bs4 import BeautifulSoup
 import requests
-from schema import FeedItem, Category
-import re
+from schema import FeedItem, Category, Feed
 from functools import lru_cache
+from typing import Any
 
-def get_guardian_categories() -> list[Category]:
+
+class GuardianCategory(Category):
+    def model_post_init(self, context: Any) -> None:
+        self.link = f"https://www.theguardian.com/{self.id}"
+
+
+@lru_cache(maxsize=1)
+def get_guardian_categories() -> list[GuardianCategory]:
     url = "https://www.theguardian.com/news/series/ten-best-photographs-of-the-day/rss"
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
     categories = []
     for item in soup.find_all("item"):
-        categories.append(Category(id=item.find("guid").text.strip().removeprefix("https://www.theguardian.com/").replace("/", "__"), name=item.find("title").text.strip()))
-    categories += [Category(id="artanddesign__gallery__2022__feb__17__ansel-adams-rare-photographs-in-stunning-hi-definition", name="Ansel Adams: rare photographs in stunning hi-definition")]
+        categories.append(
+            GuardianCategory(
+                id=item.find("guid")
+                .text.strip()
+                .removeprefix("https://www.theguardian.com/")
+                .replace("/", "__"),
+                name=item.find("title").text.strip(),
+            )
+        )
+    categories += [
+        GuardianCategory(
+            id="artanddesign__gallery__2022__feb__17__ansel-adams-rare-photographs-in-stunning-hi-definition",
+            name="Ansel Adams: rare photographs in stunning hi-definition",
+        )
+    ]
     return categories
 
 
-def get_guardian_photos_feed(category: str) -> list[FeedItem]:
+def get_guardian_photos_feed(category: str) -> Feed:
     url = f"https://www.theguardian.com/{category}"
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
@@ -49,7 +69,19 @@ def get_guardian_photos_feed(category: str) -> list[FeedItem]:
     # Put all the items together
     for i in range(len(images)):
         items.append(FeedItem(id=links[i].split("#")[-1], title=titles[i], description=captions[i], image_url=images[i], link=links[i]))
-    return items
+    category_name = list(
+        filter(
+            lambda x: x.id == (category.replace("/", "__") if category else ""),
+            get_guardian_categories(),
+        )
+    )
+    if len(category_name) > 0:
+        category_name = category_name[0].name
+    else:
+        category_name = category.replace("__", " ").title()
+
+    return Feed(items=items, category=GuardianCategory(id=category, name=category_name))
+
 
 if __name__ == "__main__":
     items = get_guardian_photos_feed("news/gallery/2025/apr/25/black-grouse-courtship-and-first-pick-of-the-nfl-draft-photos-of-the-day-friday")

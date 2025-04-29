@@ -1,28 +1,36 @@
+from typing import Any
 import requests
-from schema import FeedItem, Category
+from schema import FeedItem, Category, Feed
 from reddit_models import RedditResponse
+from functools import lru_cache
 
 
-def get_reddit_categories() -> list[Category]:
+class RedditCategory(Category):
+    def model_post_init(self, context: Any) -> None:
+        self.link = f"https://www.reddit.com/r/{self.id}"
+
+
+@lru_cache(maxsize=1)
+def get_reddit_categories() -> list[RedditCategory]:
     return sorted(
         [
-            Category(id="landscapephotography", name="r/LandscapePhotography"),
-            Category(id="art", name="r/Art"),
-            Category(id="analog", name="r/Analog"),
-            Category(id="filmphotography", name="r/FilmPhotography"),
-            Category(id="wildlifephotography", name="r/WildlifePhotography"),
-            Category(id="streetphotography", name="r/StreetPhotography"),
-            Category(id="astrophotography", name="r/Astrophotography"),
-            Category(id="MoviePosterPorn", name="r/MoviePosterPorn"),
-            Category(id="wallpapers", name="r/Wallpapers"),
-            Category(id="minimalistphotography", name="r/MinimalistPhotography"),
-            Category(id="blackandwhite", name="r/BlackAndWhite"),
+            RedditCategory(id="landscapephotography", name="r/LandscapePhotography"),
+            RedditCategory(id="art", name="r/Art"),
+            RedditCategory(id="analog", name="r/Analog"),
+            RedditCategory(id="filmphotography", name="r/FilmPhotography"),
+            RedditCategory(id="wildlifephotography", name="r/WildlifePhotography"),
+            RedditCategory(id="streetphotography", name="r/StreetPhotography"),
+            RedditCategory(id="astrophotography", name="r/Astrophotography"),
+            RedditCategory(id="MoviePosterPorn", name="r/MoviePosterPorn"),
+            RedditCategory(id="wallpapers", name="r/Wallpapers"),
+            RedditCategory(id="minimalistphotography", name="r/MinimalistPhotography"),
+            RedditCategory(id="blackandwhite", name="r/BlackAndWhite"),
         ],
         key=lambda x: x.name,
     )
 
 
-def get_reddit_feed(category: str, hd: bool = False) -> list[FeedItem]:
+def get_reddit_feed(category: str, hd: bool = False) -> Feed:
     url = f"https://www.reddit.com/r/{category}/top.json?t=month&limit=20&raw_json=1"
     # Spoof a browser request
     response = requests.get(
@@ -87,7 +95,18 @@ def get_reddit_feed(category: str, hd: bool = False) -> list[FeedItem]:
                     )
                 )
 
-    return items
+    category_name = list(
+        filter(
+            lambda x: x.id == (category if category else ""),
+            get_reddit_categories(),
+        )
+    )
+    if len(category_name) > 0:
+        category_name = category_name[0].name
+    else:
+        category_name = "r/" + category.replace("-", " ").title()
+
+    return Feed(items=items, category=RedditCategory(id=category, name=category_name))
 
 
 if __name__ == "__main__":

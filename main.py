@@ -1,27 +1,23 @@
-from fastapi import FastAPI, Request, Response, HTTPException, Query
-from fastapi.responses import HTMLResponse
+import random
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 import httpx
 import xml.etree.ElementTree as ET
-import re
 from bs4 import BeautifulSoup
-from pydantic import BaseModel, computed_field
 from typing import List, Literal, Optional
-from starlette.middleware.sessions import SessionMiddleware
-import json
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
-import hashlib
+from datetime import datetime
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
+from apod import get_apod_categories, get_apod_feed
+from thisiscolossal import get_thisiscolossal_categories, get_thisiscolossal_feed
 from ukiyoe import get_ukiyo_e_feed, get_ukiyo_e_categories
 from guardian_photos import get_guardian_categories, get_guardian_photos_feed
 from reddit import get_reddit_feed, get_reddit_categories
-from wikiart import get_wikiart_feed, get_wikiart_categories
+from wikiart import get_popular_artists, get_wikiart_feed, get_wikiart_categories
 
-from schema import FeedItem, Category
+from schema import FeedItem, Category, Feed
 
 FastAPICache.init(InMemoryBackend(), prefix="bijukaru")
 
@@ -78,168 +74,51 @@ async def read_root(
 
 @app.get("/api/thisiscolossal/categories", response_model=List[Category])
 @cache(expire=3600)  # Cache for 1 hour
-async def get_thisiscolossal_categories():
-    # Return the list of categories
-    categories = [
-        Category(id="", name="All Posts"),
-        Category(id="art", name="Art"),
-        Category(id="craft", name="Craft"),
-        Category(id="design", name="Design"),
-        Category(id="photography", name="Photography"),
-        Category(id="animation", name="Animation"),
-        Category(id="books", name="Books"),
-        Category(id="climate", name="Climate"),
-        Category(id="film", name="Film"),
-        Category(id="history", name="History"),
-        Category(id="conversations", name="Conversations"),
-        Category(id="illustration", name="Illustration"),
-        Category(id="music", name="Music"),
-        Category(id="nature", name="Nature"),
-        Category(id="opportunities", name="Opportunities"),
-        Category(id="science", name="Science"),
-        Category(id="social-issues", name="Social Issues"),
-    ]
-    return categories
+async def _get_thisiscolossal_categories():
+    return get_thisiscolossal_categories()
 
-@app.get("/api/thisiscolossal/feed", response_model=List[FeedItem])
+
+@app.get("/api/thisiscolossal/feed", response_model=Feed)
 @cache(expire=600)  # Cache for 10 minutes (600 seconds)
-async def get_thisiscolossal_feed(category: Optional[str] = None):
-    # Construct the feed URL based on the category
-    if category:
-        feed_url = f"https://www.thisiscolossal.com/category/{category}/feed/"
-    else:
-        feed_url = "https://www.thisiscolossal.com/feed/"
+async def _get_thisiscolossal_feed(category: Optional[str] = None):
+    return await get_thisiscolossal_feed(category)
 
-    # Fetch the RSS feed
-    async with httpx.AsyncClient() as client:
-        response = await client.get(feed_url)
-
-    if response.status_code != 200:
-        return []
-
-    # Parse the XML
-    root = ET.fromstring(response.text)
-
-    # Find the namespace
-    ns = {"content": "http://purl.org/rss/1.0/modules/content/"}
-
-    items = []
-    for item in root.findall(".//item"):
-        title = item.find("title").text if item.find("title") is not None else "No Title"
-        link = item.find("link").text if item.find("link") is not None else "#"
-        slug = item.find("link").text.removesuffix("/").split("/")[-1]
-
-        # Extract the content
-        content_element = item.find(".//content:encoded", ns)
-        content = content_element.text if content_element is not None else ""
-
-        # Parse the HTML content to find the first image
-        soup = BeautifulSoup(content, "html.parser")
-        img_tag = soup.find("img")
-
-        image_url = ""
-        if img_tag and img_tag.get("src"):
-            image_url = img_tag.get("src")
-
-        # Get a short description
-        description_element = item.find("description")
-        description = ""
-        if description_element is not None and description_element.text:
-            # Clean HTML tags
-            soup = BeautifulSoup(description_element.text, "html.parser")
-            description = soup.get_text()
-
-        # Only add items that have images
-        if image_url:
-            items.append(FeedItem(
-                id=slug,
-                title=title,
-                image_url=image_url,
-                link=link,
-                description=description
-            ))
-
-    return items  # Return items with images
 
 @app.get("/api/apod/categories", response_model=List[Category])
 @cache(expire=3600)  # Cache for 1 hour
-async def get_apod_categories():
-    # Generate a list of years starting from current year down to 2015
-    current_year = datetime.now().year
-    categories = []
+async def _get_apod_categories():
+    return get_apod_categories()
 
-    for year in range(current_year, 1995, -1):
-        categories.append(Category(id=str(year), name=str(year)))
 
-    return categories
-
-@app.get("/api/apod/feed", response_model=List[FeedItem])
+@app.get("/api/apod/feed", response_model=Feed)
 @cache(expire=600)  # Cache for 10 minutes
-async def get_apod_feed(category: Optional[str] = None, hd: bool = False):
-    # Determine start_date based on category (which is a year)
-    if category and category.isdigit():
-        start_date = f"{category}-01-01"
-    else:
-        # If no category or invalid, use current year
-        current_year = datetime.now().year
-        start_date = f"{current_year}-01-01"
+async def _get_apod_feed(category: Optional[str] = None, hd: bool = False):
+    return await get_apod_feed(category, hd)
 
-    # Construct the API URL
-    api_url = f"https://apod.ellanan.com/api?start_date={start_date}&limit=365"
-
-    # Fetch the JSON data
-    async with httpx.AsyncClient() as client:
-        response = await client.get(api_url)
-
-    if response.status_code != 200:
-        return []
-
-    # Parse the JSON data
-    apod_items = response.json()
-
-    # Convert to FeedItem format
-    items = []
-    for item in apod_items:
-        # Skip items without images or with media_type other than image
-        if "url" not in item or item.get("media_type") != "image":
-            continue
-
-        # For APOD, the link should go to the official NASA APOD page
-        date_parts = item["date"].split("-")
-        link = f"https://apod.nasa.gov/apod/ap{date_parts[0][2:]}{date_parts[1]}{date_parts[2]}.html"
-
-        description = item.get("explanation", "")
-
-        items.append(FeedItem(
-            id=item.get("date"),
-            title=item.get("title", "No Title"),
-            image_url=item["hdurl"] if ("hdurl" in item and hd) else item["url"],
-            link=link,
-            description=description
-        ))
-
-    return items
 
 @app.get("/api/ukiyo-e/categories", response_model=List[Category])
 @cache(expire=3600)  # Cache for 1 hour
 async def _get_ukiyo_e_categories():
     return get_ukiyo_e_categories()
 
-@app.get("/api/ukiyo-e/feed", response_model=List[FeedItem])
+
+@app.get("/api/ukiyo-e/feed", response_model=Feed)
 @cache(expire=60 * 60 * 24)  # Cache for 1 day
 async def _get_ukiyo_e_feed(category: str = "met"):
     # Get multiple pages of data
     items = []
     for start in [1, 100, 200, 300]:
-        items.extend(get_ukiyo_e_feed(category, start))
-    return items
+        feed = get_ukiyo_e_feed(category, start)
+        items.extend(feed.items)
+    return Feed(items=items, category=feed.category)
 
 @app.get("/api/guardian/categories", response_model=List[Category])
 @cache(expire=3600)  # Cache for 1 hour
 async def _get_guardian_photos_categories():
     return get_guardian_categories()
 
-@app.get("/api/guardian/feed", response_model=List[FeedItem])
+
+@app.get("/api/guardian/feed", response_model=Feed)
 @cache(expire=60 * 60 * 24)  # Cache for 1 day
 async def _get_guardian_photos_feed(category: str = get_guardian_categories()[0].id):
     return get_guardian_photos_feed(category.replace("__", "/"))
@@ -249,7 +128,8 @@ async def _get_guardian_photos_feed(category: str = get_guardian_categories()[0]
 async def _get_reddit_categories():
     return get_reddit_categories()
 
-@app.get("/api/reddit/feed", response_model=List[FeedItem])
+
+@app.get("/api/reddit/feed", response_model=Feed)
 @cache(expire=60 * 60 * 24)  # Cache for 1 day
 async def _get_reddit_feed(category: str = get_reddit_categories()[0].id, hd: bool = False):
     return get_reddit_feed(category, hd)
@@ -261,10 +141,23 @@ async def _get_wikiart_categories():
     return get_wikiart_categories()
 
 
-@app.get("/api/wikiart/feed", response_model=List[FeedItem])
-@cache(expire=60 * 60 * 24)  # Cache for 1 day
+@app.get("/api/wikiart/feed")
 async def _get_wikiart_feed(category: str = "ansel-adams", hd: bool = False):
-    return get_wikiart_feed(category, hd)
+    if category == "random-artist":
+        _category = "artist:" + random.choice(get_popular_artists())
+    else:
+        _category = category
+    # Send cache control headers
+    content = get_wikiart_feed(_category, hd)
+    response = JSONResponse(
+        content=content.model_dump(),
+        headers={
+            "Cache-Control": (
+                "public, max-age=3600" if category != "random-artist" else "no-cache"
+            )
+        },
+    )
+    return response
 
 
 @app.get("/api/media_sources")

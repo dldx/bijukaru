@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 import requests
-from schema import FeedItem, Category
+from schema import Feed, FeedItem, Category
 import orjson
 import re
 from functools import lru_cache
@@ -54,19 +54,32 @@ def cluster_items(data_array: list[any], category: str | None) -> list[FeedItem]
 
     return items
 
-def get_ukiyo_e_feed(category: str, start: int = 1) -> list[FeedItem]:
+
+def get_ukiyo_e_feed(category: str, start: int = 1) -> Feed:
     if category in [cat.id for cat in get_ukiyo_e_categories()]:
         url = f"https://ukiyo-e.org/source/{category}.data?start={start}"
+        cluster_category = category
     else:
         ## Asume category is actually an artist name
         url = f"https://ukiyo-e.org/artist/{category}.data?start={start}"
-        category = None
+        cluster_category = None
     response = requests.get(url, allow_redirects=True)
     json_data = orjson.loads(response.content.decode("utf-8"))
 
-    items = cluster_items(json_data, category)
+    items = cluster_items(json_data, cluster_category)
 
-    return items
+    category_name = list(
+        filter(
+            lambda x: x.id == (category if category else ""),
+            get_ukiyo_e_categories(),
+        )
+    )
+    if len(category_name) > 0:
+        category_name = category_name[0].name
+    else:
+        category_name = category.replace("-", " ").title()
+
+    return Feed(items=items, category=Category(id=category, name=category_name))
 
 
 if __name__ == "__main__":

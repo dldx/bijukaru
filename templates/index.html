@@ -820,6 +820,9 @@
 
                 // Get current category name
                 getCurrentCategoryName() {
+                    if (this.category) {
+                        return this.category.name;
+                    }
                     if (!this.selectedCategory || this.categories.length === 0) return '';
 
                     const category = this.categories.find(c => c.id === this.selectedCategory);
@@ -1100,7 +1103,9 @@
                             throw new Error('Failed to fetch RSS feed');
                         }
 
-                        this.items = await response.json();
+                        const feed = await response.json();
+                        this.items = feed.items;
+                        this.category = feed.category;
 
                         // Log information about item descriptions
                         if (!["apod", "reddit"].includes("{{ media_source }}")) {
