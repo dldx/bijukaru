@@ -551,7 +551,7 @@
 
                 <!-- Pagination and controls -->
                 <div
-                    class="flex justify-between items-center text-sm control-bar"
+                    class="flex justify-center items-center text-sm control-bar"
                     x-show="!hideToolbar">
 
                     <!-- Clustered selectors-->
@@ -562,7 +562,7 @@
                             <select
                                 x-model="selectedMediaSource"
                                 @change="changeMediaSource()"
-                                class="bg-white dark:bg-dark-surface px-4 py-2 border-gray-300 border-unset dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-dark-text">
+                                class="bg-white dark:bg-dark-surface px-4 py-2 border-gray-300 border-unset dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[50vw] md:max-w-none text-gray-800 dark:text-dark-text">
                                 <template x-for="source in mediaSources"
                                     :key="source.id">
                                     <option :value="source.id"
@@ -594,7 +594,7 @@
                     </div>
 
                     <!-- Clustered controls group -->
-                    <div class="flex items-center space-x-2">
+                    <div class="flex justify-center items-center space-x-2">
                         <!-- Pause/Resume button -->
                         <button
                             @click="togglePause"
