@@ -432,7 +432,7 @@
                 <div class="image-container">
                     <!-- Loading state -->
                     <div x-show="loading"
-                        class="z-50 absolute flex justify-center items-center backdrop-blur-md w-full h-full">
+                        class="z-10 absolute flex justify-center items-center backdrop-blur-md w-full h-full">
                         <div
                             class="border-gray-700 dark:border-gray-300 border-b-2 rounded-full w-12 h-12 animate-spin"></div>
                     </div>
@@ -625,7 +625,7 @@
                         <!-- HD toggle button - only show if media source supports HD -->
                         <button
                             @click="toggleHD"
-                            x-show="{{ media_hd }}"
+                            x-show="hdSupported"
                             class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none"
                             :class="isHD ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'"
                             title="Toggle HD images">
@@ -739,7 +739,7 @@
                 prefetchDebounceTimer: null, // Timer for debouncing prefetch operations
                 prefetchDebounceDelay: 300, // Debounce delay in milliseconds
                 wasPlayingBeforeTouch: false, // Track if slideshow was playing before touch
-
+                hdSupported: "{{ media_hd }}", // Track if category supports HD
                 get currentItem() {
                     return this.items[this.currentIndex] || null;
                 },
@@ -851,14 +851,13 @@
                     // Apply dark mode on page load
                     this.applyTheme();
 
-                    // Check if HD is supported
-                    const hdSupported = document.querySelector('.main-container').dataset.hdSupported === 'true';
 
                     // Fetch media sources
                     await this.loadMediaSources();
 
                     // Fetch categories first
                     await this.loadCategories();
+
 
                     // Check for URL parameters
                     const urlParams = new URLSearchParams(window.location.search);
@@ -1431,7 +1430,11 @@
                         // Fallback to default sources if API fails
                         this.mediaSources = [
                             { id: "thisiscolossal", name: "This is Colossal" },
-                            { id: "apod", name: "Astronomy Picture of the Day" }
+                            { id: "apod", name: "Astronomy Picture of the Day" },
+                            { id: "ukiyo-e", name: "Ukiyo-e" },
+                            { id: "guardian", name: "Guardian" },
+                            { id: "reddit", name: "Reddit" },
+                            { id: "wikiart", name: "WikiArt" }
                         ];
                     }
                 },
@@ -1453,6 +1456,8 @@
                         this.selectedCategory = "";
                         this.categoryIndex = 0;
                         this.targetImageId = null;
+                        // Check if HD is supported
+                        this.hdSupported = this.mediaSources.find(source => source.id === this.selectedMediaSource).hdSupported;
 
                         // Preserve interval parameter if it exists
                         if (this.slideInterval !== 10000) {

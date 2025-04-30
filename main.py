@@ -31,7 +31,7 @@ media_sources = {
     "apod": {
         "media_source_name": "Astronomy Picture of the Day",
         "media_source_url": "https://apod.nasa.gov/apod/astropix.html",
-        "media_hd_option": "true",
+        "media_hd": "true",
     },
     "thisiscolossal": {
         "media_source_name": "This is Colossal",
@@ -168,8 +168,12 @@ async def get_media_sources():
     """Return a list of all available media sources."""
     sources = []
     for source_id, source_info in media_sources.items():
-        sources.append({
-            "id": source_id,
-            "name": source_info["media_source_name"]
-        })
+        sources.append(
+            {
+                "id": source_id,
+                "name": source_info["media_source_name"],
+                "hdSupported": source_info["media_hd"] == "true",
+                "url": source_info["media_source_url"],
+            }
+        )
     return sources
