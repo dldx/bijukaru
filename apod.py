@@ -59,4 +59,4 @@ async def get_apod_feed(category: str | None = None, hd: bool = False):
             )
         )
 
-    return Feed(items=items, category=Category(id=category, name=category))
+    return Feed(items=items, category=Category(id=str(category), name=str(category)))

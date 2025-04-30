@@ -142,7 +142,9 @@ async def _get_wikiart_categories():
 
 
 @app.get("/api/wikiart/feed")
-async def _get_wikiart_feed(category: str = "ansel-adams", hd: bool = False):
+async def _get_wikiart_feed(
+    category: str = get_wikiart_categories()[0].id, hd: bool = False
+):
     if category == "random-artist":
         _category = "artist:" + random.choice(get_popular_artists())
     else:

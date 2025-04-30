@@ -132,6 +132,7 @@ def get_wikiart_feed(category: str, hd: bool = False) -> Feed:
     """Fetch artworks for a specific artist from WikiArt."""
     import random
 
+    url = "https://www.wikiart.org"
     if category == "most-viewed":
         url = f"https://www.wikiart.org/en/App/Painting/MostViewedPaintings?offset=0&quantity=50&limit=100&randomSeed={random.randint(0, 1000)}&json=2"
     if category.startswith("artist:"):
@@ -148,18 +149,34 @@ def get_wikiart_feed(category: str, hd: bool = False) -> Feed:
     )
 
     if response.status_code != 200:
-        raise Exception(f"Failed to fetch WikiArt feed for artist {category}")
+        raise Exception(
+            f"Failed to fetch WikiArt feed for artist {category}. Status code: {response.status_code}"
+        )
+
+    try:
+        response_data = response.json()
+    except requests.exceptions.JSONDecodeError as e:
+        print(
+            f"Error decoding JSON from WikiArt API. Response text: {response.text[:200]}..."
+        )
+        raise Exception(f"Invalid JSON response from WikiArt API: {str(e)}")
 
     # Parse the JSON response into WikiArtArtwork objects
     if category.startswith("style:"):
+        if "Paintings" not in response_data:
+            raise Exception(
+                f"Expected 'Paintings' key in response for style category {category}"
+            )
         artworks = [
             WikiArtArtwork.model_validate(artwork)
-            for artwork in response.json()["Paintings"]
+            for artwork in response_data["Paintings"]
         ]
     else:
-        artworks = [
-            WikiArtArtwork.model_validate(artwork) for artwork in response.json()
-        ]
+        if not isinstance(response_data, list):
+            raise Exception(
+                f"Expected list response for category {category}, got {type(response_data)}"
+            )
+        artworks = [WikiArtArtwork.model_validate(artwork) for artwork in response_data]
 
     # Convert to FeedItem format
     items = []

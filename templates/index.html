@@ -5,12 +5,15 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description"
             content="A minimalist gallery of art from various sources, including This is Colossal, Guardian, APOD Ukiyo-e.org, and Reddit.">
-        <meta name="keywords" content="art, gallery, bijukaru, images, rss, thisiscolossal, guardian, apod, ukiyo-e, reddit">
+        <meta name="keywords"
+            content="art, gallery, bijukaru, images, rss, thisiscolossal, guardian, apod, ukiyo-e, reddit">
         <link rel="icon" href="https://fav.farm/🌄">
         <title>{{ media_source_name }} - Bijukaru picture carousel</title>
         <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Domine:wght@400..700&display=swap" rel="stylesheet">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Domine:wght@400..700&display=swap"
+            rel="stylesheet">
         <!-- Tailwind CSS CDN -->
         <script src="https://cdn.tailwindcss.com"></script>
         <script>
@@ -254,23 +257,6 @@
           -ms-overflow-style: none;  /* IE and Edge */
           scrollbar-width: none;  /* Firefox */
     }
-        /* Responsive adjustments */
-        @media (max-width: 640px) {
-            .control-bar {
-                padding: 0.5rem;
-            }
-
-            .category-selector select {
-                max-width: 120px;
-                font-size: 0.8rem;
-                padding: 0.3rem;
-            }
-
-            .light-toggle {
-                transform: scale(0.7);
-                margin-right: -0.5rem;
-            }
-        }
         /* Category navigation buttons */
         .category-nav-button {
             position: absolute;
@@ -354,11 +340,6 @@
     <body
         class="bg-gray-100 dark:bg-dark-bg text-gray-900 dark:text-dark-text transition-colors duration-300">
         <div class="main-container" x-data="gallery()">
-            <!-- Loading state -->
-            <div x-show="loading" class="flex justify-center items-center h-64">
-                <div
-                    class="border-gray-700 dark:border-gray-300 border-b-2 rounded-full w-12 h-12 animate-spin"></div>
-            </div>
 
             <!-- Help Overlay -->
             <div x-show="showHelp" class="help-overlay"
@@ -432,7 +413,7 @@
             </div>
 
             <!-- Gallery -->
-            <div x-show="!loading && items.length > 0" class="gallery-wrapper">
+            <div x-show="items.length > 0" class="gallery-wrapper">
                 <!-- Exit fullscreen button for mobile -->
                 <button
                     x-show="hideToolbar"
@@ -449,6 +430,12 @@
 
                 <!-- Image container -->
                 <div class="image-container">
+                    <!-- Loading state -->
+                    <div x-show="loading"
+                        class="z-50 absolute flex justify-center items-center backdrop-blur-md w-full h-full">
+                        <div
+                            class="border-gray-700 dark:border-gray-300 border-b-2 rounded-full w-12 h-12 animate-spin"></div>
+                    </div>
                     <div
                         class="relative flex justify-center items-center w-full h-full">
                         <img
@@ -465,8 +452,10 @@
                             x-transition:leave-end="fade-leave-to">
 
                         <!-- Mobile navigation areas -->
-                        <div class="mobile-nav-area mobile-nav-prev" @click="prevItem"></div>
-                        <div class="mobile-nav-area mobile-nav-next" @click="nextItem"></div>
+                        <div class="mobile-nav-area mobile-nav-prev"
+                            @click="prevItem"></div>
+                        <div class="mobile-nav-area mobile-nav-next"
+                            @click="nextItem"></div>
 
                         <!-- Previous image button -->
                         <button
@@ -502,9 +491,12 @@
                             class="opacity-80 hover:opacity-100 category-nav-button category-up nav-button"
                             x-show="categories.length > 1"
                             aria-label="Previous category">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="w-5 h-5"
+                                fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round"
                                     stroke-width="2" d="M5 15l7-7 7 7" />
                             </svg>
                             <span x-text="getPrevCategoryName()"></span>
@@ -516,9 +508,12 @@
                             class="opacity-80 hover:opacity-100 category-nav-button category-down nav-button"
                             x-show="categories.length > 1"
                             aria-label="Next category">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="w-5 h-5"
+                                fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round"
                                     stroke-width="2" d="M19 9l-7 7-7-7" />
                             </svg>
                             <span x-text="getNextCategoryName()"></span>
@@ -560,37 +555,38 @@
                     x-show="!hideToolbar">
 
                     <!-- Clustered selectors-->
-                    <div class="flex items-center space-x-2">
-                    <!-- Media source selector -->
-                    <div
-                        class="flex justify-center items-center media-source-selector">
-                        <select
-                            x-model="selectedMediaSource"
-                            @change="changeMediaSource()"
-                            class="bg-white dark:bg-dark-surface px-4 py-2 border-gray-300 border-unset dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-dark-text">
-                            <template x-for="source in mediaSources"
-                                :key="source.id">
-                                <option :value="source.id" x-text="source.name"
-                                    :selected="source.id === selectedMediaSource"></option>
-                            </template>
-                        </select>
+                    <div class="flex flex-shrink items-center space-x-2">
+                        <!-- Media source selector -->
+                        <div
+                            class="flex justify-center items-center media-source-selector">
+                            <select
+                                x-model="selectedMediaSource"
+                                @change="changeMediaSource()"
+                                class="bg-white dark:bg-dark-surface px-4 py-2 border-gray-300 border-unset dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-dark-text">
+                                <template x-for="source in mediaSources"
+                                    :key="source.id">
+                                    <option :value="source.id"
+                                        x-text="source.name"
+                                        :selected="source.id === selectedMediaSource"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <!-- Category selector -->
+                        <div
+                            class="flex flex-shrink justify-center items-center category-selector">
+                            <select
+                                x-model="selectedCategory"
+                                @change="loadCategory()"
+                                class="bg-white dark:bg-dark-surface px-4 py-2 border-gray-300 border-unset dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-full md:max-w-[30vw] xl:max-w-none text-gray-800 dark:text-dark-text">
+                                <template x-for="category in categories"
+                                    :key="category.id">
+                                    <option :value="category.id"
+                                        x-text="category.name"></option>
+                                </template>
+                            </select>
+                        </div>
                     </div>
-                    <!-- Category selector -->
-                    <div
-                        class="flex justify-center items-center category-selector">
-                        <select
-                            x-model="selectedCategory"
-                            @change="loadCategory()"
-                            class="bg-white dark:bg-dark-surface px-4 py-2 border-gray-300 border-unset dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-dark-text">
-                            <template x-for="category in categories"
-                                :key="category.id">
-                                <option :value="category.id"
-                                    x-text="category.name"></option>
-                            </template>
-                        </select>
-                    </div>
-                    </div>
-                    <div class="flex justify-center items-center">
+                    <div class="flex flex-grow justify-center items-center">
                         <span class="text-gray-600 dark:text-gray-400 text-sm">
                             <span x-text="currentIndex + 1"></span> of <span
                                 x-text="items.length"></span>
@@ -605,15 +601,24 @@
                             class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none"
                             :class="isPaused ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'"
                             title="Pause/Resume slideshow">
-                            <svg x-show="!isPaused" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
+                            <svg x-show="!isPaused"
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="w-5 h-5"
+                                fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round"
                                     stroke-width="2" d="M10 9v6m4-6v6" />
                             </svg>
-                            <svg x-show="isPaused" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <svg x-show="isPaused"
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="w-5 h-5"
+                                fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                             </svg>
                         </button>
 
@@ -624,7 +629,10 @@
                             class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none"
                             :class="isHD ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'"
                             title="Toggle HD images">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M3 3h18a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1m4.5 8.25V9H6v6h1.5v-2.25h2V15H11V9H9.5v2.25zm7-.75H16a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5h-1.5zM13 9v6h3a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2z"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24"
+                                height="24" viewBox="0 0 24 24"><path
+                                    fill="currentColor"
+                                    d="M3 3h18a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1m4.5 8.25V9H6v6h1.5v-2.25h2V15H11V9H9.5v2.25zm7-.75H16a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5h-1.5zM13 9v6h3a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2z" /></svg>
                         </button>
 
                         <!-- Fullscreen toggle button -->
@@ -632,10 +640,12 @@
                             @click="toggleFullscreen"
                             class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none text-gray-600 dark:text-gray-400"
                             title="Toggle fullscreen">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="w-5 h-5"
                                 fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round"
                                     stroke-width="2"
                                     d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
                             </svg>
@@ -647,11 +657,14 @@
                             class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none"
                             :class="showDescription ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'"
                             title="Toggle description">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="w-5 h-5"
                                 fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M4 6h16M4 12h16m-7 6h7" />
                             </svg>
                         </button>
 
@@ -659,7 +672,8 @@
                         <div class="flex items-center space-x-2 scale-75">
                             <span class="text-sm">
                                 <svg xmlns="http://www.w3.org/2000/svg"
-                                    class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                    class="w-5 h-5" fill="none"
+                                    viewBox="0 0 24 24"
                                     stroke="currentColor">
                                     <path stroke-linecap="round"
                                         stroke-linejoin="round" stroke-width="2"
@@ -673,7 +687,8 @@
                             </label>
                             <span class="text-sm">
                                 <svg xmlns="http://www.w3.org/2000/svg"
-                                    class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                    class="w-5 h-5" fill="none"
+                                    viewBox="0 0 24 24"
                                     stroke="currentColor">
                                     <path stroke-linecap="round"
                                         stroke-linejoin="round" stroke-width="2"
@@ -731,10 +746,13 @@
 
                 // Update document title with current image
                 updateDocumentTitle() {
+                    const sourceInfo = this.mediaSources.find(s => s.id === this.selectedMediaSource);
+                    const sourceName = sourceInfo ? sourceInfo.name : 'Unknown Source';
+
                     if (this.currentItem) {
-                        document.title = `${this.currentItem.title} - ${this.getCurrentCategoryName()} - {{ media_source_name }} - Bijukaru picture carousel`;
+                        document.title = `${this.currentItem.title} - ${this.getCurrentCategoryName()} - ${sourceName} - Bijukaru picture carousel`;
                     } else {
-                        document.title = `${this.getCurrentCategoryName()} - {{ media_source_name }} - Bijukaru picture carousel`;
+                        document.title = `${this.getCurrentCategoryName()} - ${sourceName} - Bijukaru picture carousel`;
                     }
                 },
 
@@ -1043,7 +1061,7 @@
 
                 async loadCategories() {
                     try {
-                        const response = await fetch('/api/{{ media_source }}/categories');
+                        const response = await fetch(`/api/${this.selectedMediaSource}/categories`);
                         if (!response.ok) {
                             throw new Error('Failed to fetch categories');
                         }
@@ -1088,7 +1106,7 @@
 
                     try {
                         // Construct URL with category parameter if selected
-                        let apiUrl = '/api/{{ media_source }}/feed';
+                        let apiUrl = `/api/${this.selectedMediaSource}/feed`;
                         if (this.selectedCategory) {
                             apiUrl += `?category=${this.selectedCategory}`;
                         }
@@ -1108,7 +1126,7 @@
                         this.category = feed.category;
 
                         // Log information about item descriptions
-                        if (!["apod", "reddit"].includes("{{ media_source }}")) {
+                        if (!["apod", "reddit"].includes(this.selectedMediaSource)) {
                             // Shuffle the items array
                             this.shuffleArray(this.items);
                         }
@@ -1419,45 +1437,72 @@
                 },
 
                 // Change media source
-                changeMediaSource() {
-                    // Get the URL parameters
-                    const urlParams = new URLSearchParams(window.location.search);
+                async changeMediaSource() {
+                    // Show loading state
+                    this.loading = true;
+                    this.error = null;
 
-                    // Preserve current image ID if there is one
-                    if (this.currentItem && this.currentItem.id) {
-                        urlParams.set('image_id', this.currentItem.id);
+                    try {
+                        // Get the URL parameters
+                        const urlParams = new URLSearchParams(window.location.search);
+
+                        // Remove image_id and category parameters when changing sources
+                        urlParams.delete('image_id');
+                        urlParams.delete('category');
+                        // Reset category-related variables
+                        this.selectedCategory = "";
+                        this.categoryIndex = 0;
+                        this.targetImageId = null;
+
+                        // Preserve interval parameter if it exists
+                        if (this.slideInterval !== 10000) {
+                            urlParams.set('interval', this.slideInterval / 1000);
+                        }
+
+                        // Preserve HD parameter if enabled
+                        if (this.isHD) {
+                            urlParams.set('hd', 'true');
+                        }
+
+                        // Preserve prefetch parameter
+                        if (this.nToPrefetch !== 2) {
+                            urlParams.set('prefetch', this.nToPrefetch);
+                        }
+
+                        // Preserve fullscreen parameter if toolbar is hidden
+                        if (this.hideToolbar) {
+                            urlParams.set('fullscreen', 'true');
+                        }
+
+                        // Preserve showDescription parameter
+                        if (this.showDescription) {
+                            urlParams.set('showDescription', 'true');
+                        }
+
+                        // Update URL without reloading
+                        const newUrl = `/${this.selectedMediaSource}?${urlParams.toString()}`;
+                        window.history.pushState({}, '', newUrl);
+
+                        // Update document title
+                        const sourceInfo = this.mediaSources.find(s => s.id === this.selectedMediaSource);
+                        if (sourceInfo) {
+                            document.title = `${sourceInfo.name} - Bijukaru picture carousel`;
+                        }
+
+                        // Load categories for new source
+                        await this.loadCategories();
+
+                        // Load feed for new source
+                        await this.loadCategory();
+
+                        // Update URL with current state
+                        this.updateURL();
+                    } catch (err) {
+                        console.error('Error changing media source:', err);
+                        this.error = 'Failed to change media source. Please try again later.';
+                    } finally {
+                        this.loading = false;
                     }
-
-                    // Remove the category parameter when changing sources
-                    urlParams.delete('category');
-
-                    // Preserve interval parameter if it exists
-                    if (this.slideInterval !== 10000) {
-                        urlParams.set('interval', this.slideInterval / 1000);
-                    }
-
-                    // Preserve HD parameter if enabled
-                    if (this.isHD) {
-                        urlParams.set('hd', 'true');
-                    }
-
-                    // Preserve prefetch parameter
-                    if (this.nToPrefetch !== 2) {
-                        urlParams.set('prefetch', this.nToPrefetch);
-                    }
-
-                    // Preserve fullscreen parameter if toolbar is hidden
-                    if (this.hideToolbar) {
-                        urlParams.set('fullscreen', 'true');
-                    }
-
-                    // Preserve showDescription parameter
-                    if (this.showDescription) {
-                        urlParams.set('showDescription', 'true');
-                    }
-
-                    // Navigate to the selected media source
-                    window.location.href = "/" + this.selectedMediaSource + "?" + urlParams.toString();
                 },
 
                 // Navigate to previous media source
