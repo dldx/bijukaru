@@ -155,8 +155,8 @@
         .toggle-switch {
             position: relative;
             display: inline-block;
-            width: 60px;
-            height: 30px;
+            width: 40px;
+            height: 20px;
         }
         .toggle-switch input {
             opacity: 0;
@@ -177,10 +177,10 @@
         .toggle-slider:before {
             position: absolute;
             content: "";
-            height: 22px;
-            width: 22px;
-            left: 4px;
-            bottom: 4px;
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
             background-color: white;
             transition: .4s;
             border-radius: 50%;
@@ -189,7 +189,7 @@
             background-color: #3b82f6;
         }
         input:checked + .toggle-slider:before {
-            transform: translateX(30px);
+            transform: translateX(20px);
         }
         /* Progress bar styling */
         .progress-container {
@@ -262,20 +262,14 @@
             position: absolute;
             left: 50%;
             transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.5);
-            color: white;
             padding: 0.5rem 1rem;
             border-radius: 1rem;
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            z-index: 20;
-            opacity: 0;
             visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
         }
         .category-nav-button.visible {
-            opacity: 1;
             visibility: visible;
         }
         .category-up {
@@ -289,20 +283,14 @@
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
-            background-color: rgba(0, 0, 0, 0.5);
-            color: white;
             padding: 0.5rem;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 20;
-            opacity: 0;
             visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
         }
         .image-nav-button.visible {
-            opacity: 1;
             visibility: visible;
         }
         .image-nav-prev {
@@ -432,12 +420,19 @@
                 <div class="image-container">
                     <!-- Loading state -->
                     <div x-show="loading"
-                        class="z-10 absolute flex justify-center items-center backdrop-blur-md w-full h-full">
+                        class="z-10 absolute flex justify-center items-center bg-black bg-opacity-50 w-full h-full transition-all duration-300">
                         <div
                             class="border-gray-700 dark:border-gray-300 border-b-2 rounded-full w-12 h-12 animate-spin"></div>
                     </div>
                     <div
-                        class="relative flex justify-center items-center w-full h-full">
+                        class="z-9 relative flex justify-center items-center w-full h-full">
+                        <!-- Media source overlay -->
+                        <div
+                            x-transition.opacity.duration.300
+                            class="top-1/2 left-1/2 z-9 fixed flex flex-col justify-center items-center bg-black bg-opacity-50 shadow-lg px-8 py-4 rounded-xl font-semibold text-white text-center transition-opacity -translate-x-1/2 -translate-y-1/2 duration-300 nav-button transform"
+                            :class="{'visible': showMediaSourceOverlay, 'opacity-0': !showMediaSourceOverlay}"
+                            x-html="mediaSourceOverlayText">
+                        </div>
                         <img
                             x-show="currentItem"
                             :src="currentItem?.image_url"
@@ -460,7 +455,7 @@
                         <!-- Previous image button -->
                         <button
                             @click="prevItem"
-                            class="image-nav-button image-nav-prev nav-button"
+                            class="bg-black bg-opacity-50 hover:bg-opacity-80 text-white transition-all duration-300 image-nav-button image-nav-prev nav-button"
                             aria-label="Previous image">
                             <svg xmlns="http://www.w3.org/2000/svg"
                                 class="w-6 h-6" fill="none" viewBox="0 0 24 24"
@@ -474,7 +469,7 @@
                         <!-- Next image button -->
                         <button
                             @click="nextItem"
-                            class="image-nav-button image-nav-next nav-button"
+                            class="bg-black bg-opacity-50 hover:bg-opacity-80 text-white transition-all duration-300 image-nav-button image-nav-next nav-button"
                             aria-label="Next image">
                             <svg xmlns="http://www.w3.org/2000/svg"
                                 class="w-6 h-6" fill="none" viewBox="0 0 24 24"
@@ -488,7 +483,7 @@
                         <!-- Category navigation - Up arrow -->
                         <button
                             @click="prevCategory"
-                            class="opacity-80 hover:opacity-100 category-nav-button category-up nav-button"
+                            class="bg-black bg-opacity-50 hover:bg-opacity-80 text-white transition-all duration-300 category-nav-button category-up nav-button"
                             x-show="categories.length > 1"
                             aria-label="Previous category">
                             <svg xmlns="http://www.w3.org/2000/svg"
@@ -505,7 +500,7 @@
                         <!-- Category navigation - Down arrow -->
                         <button
                             @click="nextCategory"
-                            class="opacity-80 hover:opacity-100 category-nav-button category-down nav-button"
+                            class="bg-black bg-opacity-50 hover:bg-opacity-80 text-white transition-all duration-300 category-nav-button category-down nav-button"
                             x-show="categories.length > 1"
                             aria-label="Next category">
                             <svg xmlns="http://www.w3.org/2000/svg"
@@ -555,7 +550,7 @@
                     x-show="!hideToolbar">
 
                     <!-- Clustered selectors-->
-                    <div class="flex flex-shrink items-center space-x-2">
+                    <div class="flex flex-shrink items-center space-x-1 md:space-x-2">
                         <!-- Media source selector -->
                         <div
                             class="flex justify-center items-center media-source-selector">
@@ -594,11 +589,11 @@
                     </div>
 
                     <!-- Clustered controls group -->
-                    <div class="flex justify-center items-center space-x-2">
+                    <div class="flex justify-center items-center space-x-1 md:space-x-2">
                         <!-- Pause/Resume button -->
                         <button
                             @click="togglePause"
-                            class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none"
+                            class="hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full focus:outline-none"
                             :class="isPaused ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'"
                             title="Pause/Resume slideshow">
                             <svg x-show="!isPaused"
@@ -626,7 +621,7 @@
                         <button
                             @click="toggleHD"
                             x-show="hdSupported"
-                            class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none"
+                            class="hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full focus:outline-none"
                             :class="isHD ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'"
                             title="Toggle HD images">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24"
@@ -638,7 +633,7 @@
                         <!-- Fullscreen toggle button -->
                         <button
                             @click="toggleFullscreen"
-                            class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none text-gray-600 dark:text-gray-400"
+                            class="hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full focus:outline-none text-gray-600 dark:text-gray-400"
                             title="Toggle fullscreen">
                             <svg xmlns="http://www.w3.org/2000/svg"
                                 class="w-5 h-5"
@@ -654,7 +649,7 @@
                         <!-- Description toggle button -->
                         <button
                             @click="showDescription = !showDescription"
-                            class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none"
+                            class="hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full focus:outline-none"
                             :class="showDescription ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'"
                             title="Toggle description">
                             <svg xmlns="http://www.w3.org/2000/svg"
@@ -669,11 +664,12 @@
                         </button>
 
                         <!-- Light/Dark mode toggle -->
-                        <div class="flex items-center space-x-2 scale-75">
+                        <div class="flex items-center space-x-1">
                             <span class="text-sm">
                                 <svg xmlns="http://www.w3.org/2000/svg"
-                                    class="w-5 h-5" fill="none"
+                                    class="w-4 h-4" fill="none"
                                     viewBox="0 0 24 24"
+
                                     stroke="currentColor">
                                     <path stroke-linecap="round"
                                         stroke-linejoin="round" stroke-width="2"
@@ -681,13 +677,13 @@
                                 </svg>
                             </span>
                             <label class="toggle-switch">
-                                <input type="checkbox" @click="toggleDarkMode"
+                                <input type="checkbox" @click="toggleDarkMode" class="opacity-0 w-0 h-0"
                                     :checked="darkMode">
                                 <span class="toggle-slider"></span>
                             </label>
                             <span class="text-sm">
                                 <svg xmlns="http://www.w3.org/2000/svg"
-                                    class="w-5 h-5" fill="none"
+                                    class="w-4 h-4" fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor">
                                     <path stroke-linecap="round"
@@ -705,6 +701,7 @@
                 class="p-8 text-gray-600 dark:text-gray-400 text-center">
                 No images found in the feed.
             </div>
+
         </div>
 
         <script>
@@ -740,6 +737,12 @@
                 prefetchDebounceDelay: 300, // Debounce delay in milliseconds
                 wasPlayingBeforeTouch: false, // Track if slideshow was playing before touch
                 hdSupported: "{{ media_hd }}", // Track if category supports HD
+                showMediaSourceOverlay: false, // Track media source overlay visibility
+                mediaSourceOverlayText: "", // Store media source overlay text
+                mediaSourceOverlayTimeout: null, // Store timeout for media source overlay
+                mediaSourceOverlayTransition: null, // Store transition timeout
+                mouseX: 0,
+                mouseY: 0,
                 get currentItem() {
                     return this.items[this.currentIndex] || null;
                 },
@@ -851,6 +854,18 @@
                     // Apply dark mode on page load
                     this.applyTheme();
 
+                    // Track mouse position
+                    this.mouseX = 0;
+                    this.mouseY = 0;
+                    document.addEventListener('mousemove', (e) => {
+                        this.mouseX = e.clientX;
+                        this.mouseY = e.clientY;
+                        const navButtons = document.querySelectorAll('.nav-button');
+                        navButtons.forEach(btn => {
+                            btn.classList.add('visible');
+                        });
+                        this.resetInactivityTimer();
+                    });
 
                     // Fetch media sources
                     await this.loadMediaSources();
@@ -971,29 +986,20 @@
                         // Any key press resets inactivity timer
                         this.resetInactivityTimer();
                     });
+                    const imageContainer = document.querySelector('.gallery-image');
 
                     // Add touch event for mobile
-                    document.addEventListener('touchstart', () => {
+                    imageContainer.addEventListener('touchstart', () => {
                         this.showControls();
                         this.resetInactivityTimer();
                     });
 
-                    // Track mouse movement
-                    document.addEventListener('mousemove', () => {
-                        const navButtons = document.querySelectorAll('.nav-button');
-                        navButtons.forEach(btn => {
-                            btn.classList.add('visible');
-                        });
-                        this.resetInactivityTimer();
-                    });
-
                     // Track clicks
-                    document.addEventListener('click', () => {
+                    imageContainer.addEventListener('click', () => {
                         this.resetInactivityTimer();
                     });
 
                     // Add mouse events for desktop
-                    const imageContainer = document.querySelector('.gallery-image');
                     if (imageContainer) {
                         imageContainer.addEventListener('mouseenter', () => {
                             this.showControls();
@@ -1146,6 +1152,8 @@
                         if (this.items.length === 0) {
                             this.error = 'No images found in the feed';
                         } else {
+                            // Show temporary category overlay
+                            this.showTemporaryMediaSourceOverlay();
                             // Update document title with initial image
                             this.updateDocumentTitle();
                             // Update URL with initial image ID
@@ -1397,13 +1405,25 @@
                     const exitBtn = document.querySelector('.exit-fullscreen-btn');
                     const navButtons = document.querySelectorAll('.nav-button');
 
-                    if (exitBtn) {
-                        exitBtn.classList.remove('visible');
-                    }
-
-                    navButtons.forEach(btn => {
-                        btn.classList.remove('visible');
+                    // Check if mouse is over any navigation buttons
+                    const isMouseOverButtons = Array.from(navButtons).some(btn => {
+                        const rect = btn.getBoundingClientRect();
+                        const mouseX = this.mouseX;
+                        const mouseY = this.mouseY;
+                        return mouseX >= rect.left && mouseX <= rect.right &&
+                               mouseY >= rect.top && mouseY <= rect.bottom;
                     });
+
+                    // Only hide if mouse is not over any buttons
+                    if (!isMouseOverButtons) {
+                        if (exitBtn) {
+                            exitBtn.classList.remove('visible');
+                        }
+
+                        navButtons.forEach(btn => {
+                            btn.classList.remove('visible');
+                        });
+                    }
                 },
 
                 resetInactivityTimer() {
@@ -1500,6 +1520,7 @@
                         // Load feed for new source
                         await this.loadCategory();
 
+
                         // Update URL with current state
                         this.updateURL();
                     } catch (err) {
@@ -1508,6 +1529,36 @@
                     } finally {
                         this.loading = false;
                     }
+                },
+
+                // Show temporary media source overlay
+                showTemporaryMediaSourceOverlay() {
+                    // Clear any existing timeouts
+                    if (this.mediaSourceOverlayTimeout) {
+                        clearTimeout(this.mediaSourceOverlayTimeout);
+                    }
+                    if (this.mediaSourceOverlayTransition) {
+                        clearTimeout(this.mediaSourceOverlayTransition);
+                    }
+
+                    // Set the media source name with HTML formatting
+                    const sourceName = this.mediaSources.find(source => source.id === this.selectedMediaSource).name;
+                    const categoryName = this.getCurrentCategoryName();
+                    this.mediaSourceOverlayText = `
+                        <div class="mb-1 font-bold text-2xl">${sourceName}</div>
+                        <div class="opacity-75 text-sm">${categoryName}</div>
+                    `;
+
+                    // First transition to visible state
+                    this.showMediaSourceOverlay = true;
+
+                    // Hide after 2 seconds with a fade-out transition
+                    this.mediaSourceOverlayTimeout = setTimeout(() => {
+                        // Start fade-out transition
+                        this.mediaSourceOverlayTransition = setTimeout(() => {
+                            this.showMediaSourceOverlay = false;
+                        }, 300); // Match the CSS transition duration
+                    }, 2000);
                 },
 
                 // Navigate to previous media source

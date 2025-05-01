@@ -14,7 +14,7 @@ def get_apod_categories():
     return categories
 
 
-async def get_apod_feed(category: str | None = None, hd: bool = False):
+async def get_apod_feed(category: str = "2025", hd: bool = False):
     # Determine start_date based on category (which is a year)
     if category and category.isdigit():
         start_date = f"{category}-01-01"

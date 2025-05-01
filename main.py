@@ -92,7 +92,7 @@ async def _get_apod_categories():
 
 @app.get("/api/apod/feed", response_model=Feed)
 @cache(expire=600)  # Cache for 10 minutes
-async def _get_apod_feed(category: Optional[str] = None, hd: bool = False):
+async def _get_apod_feed(category: str = "2025", hd: bool = False):
     return await get_apod_feed(category, hd)
 
 
