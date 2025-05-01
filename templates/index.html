@@ -1080,7 +1080,7 @@
                         });
 
                         // Add touch events for pausing slideshow while touching the image
-                        document.querySelector('.gallery-image').addEventListener('touchstart', () => {
+                        imageContainer.addEventListener('touchstart', () => {
                             // Save current state before pausing
                             if (!this.isPaused) {
                                 this.wasPlayingBeforeTouch = true;
@@ -1088,7 +1088,7 @@
                             }
                         });
 
-                        document.querySelector('.gallery-image').addEventListener('touchend', () => {
+                        imageContainer.addEventListener('touchend', () => {
                             // Resume only if it was playing before touch
                             if (this.wasPlayingBeforeTouch) {
                                 this.wasPlayingBeforeTouch = false;
@@ -1295,6 +1295,13 @@
                 nextItem() {
                     this.direction = 'next';
                     this.currentIndex = (this.currentIndex + 1) % this.items.length;
+                    // Hide category navigation buttons
+                    const categoryButtons = document.querySelectorAll('.category-nav-button');
+                    categoryButtons.forEach(btn => {
+                        btn.classList.remove('visible');
+                    });
+                    // Hide media source overlay
+                    this.showMediaSourceOverlay = false;
                     // Update document title
                     this.updateDocumentTitle();
                     // Update URL with current image ID
@@ -1315,6 +1322,13 @@
                     this.stopAutoSlide();
                     this.direction = 'prev';
                     this.currentIndex = (this.currentIndex - 1 + this.items.length) % this.items.length;
+                    // Hide category navigation buttons
+                    const categoryButtons = document.querySelectorAll('.category-nav-button');
+                    categoryButtons.forEach(btn => {
+                        btn.classList.remove('visible');
+                    });
+                    // Hide media source overlay
+                    this.showMediaSourceOverlay = false;
                     // Update document title
                     this.updateDocumentTitle();
                     // Update URL with current image ID
