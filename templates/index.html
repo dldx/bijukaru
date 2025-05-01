@@ -256,7 +256,21 @@
         .hide-scrollbar {
           -ms-overflow-style: none;  /* IE and Edge */
           scrollbar-width: none;  /* Firefox */
-    }
+        }
+        /* Mobile title truncation */
+        .mobile-truncate {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 100%;
+        }
+        @media (min-width: 640px) {
+            .mobile-truncate {
+                white-space: normal;
+                overflow: visible;
+                text-overflow: unset;
+            }
+        }
         /* Category navigation buttons */
         .category-nav-button {
             position: absolute;
@@ -268,6 +282,18 @@
             align-items: center;
             gap: 0.5rem;
             visibility: hidden;
+            max-width: 80%;
+        }
+        .category-nav-button span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 150px;
+        }
+        @media (min-width: 640px) {
+            .category-nav-button span {
+                max-width: none;
+            }
         }
         .category-nav-button.visible {
             visibility: visible;
@@ -431,7 +457,8 @@
                             x-transition.opacity.duration.300
                             class="top-1/2 left-1/2 z-9 fixed flex flex-col justify-center items-center bg-black bg-opacity-50 shadow-lg px-8 py-4 rounded-xl font-semibold text-white text-center transition-opacity -translate-x-1/2 -translate-y-1/2 duration-300 nav-button transform"
                             :class="{'visible': showMediaSourceOverlay, 'opacity-0': !showMediaSourceOverlay}"
-                            x-html="mediaSourceOverlayText">
+                            x-html="mediaSourceOverlayText"
+                            x-show="!isMobile">
                         </div>
                         <img
                             x-show="currentItem"
@@ -487,7 +514,7 @@
                             x-show="categories.length > 1"
                             aria-label="Previous category">
                             <svg xmlns="http://www.w3.org/2000/svg"
-                                class="w-5 h-5"
+                                class="flex-shrink-0 w-5 h-5"
                                 fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round"
@@ -504,7 +531,7 @@
                             x-show="categories.length > 1"
                             aria-label="Next category">
                             <svg xmlns="http://www.w3.org/2000/svg"
-                                class="w-5 h-5"
+                                class="flex-shrink-0 w-5 h-5"
                                 fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round"
@@ -524,7 +551,7 @@
                                     class="font-semibold"></h2>
                             </a>
                             <div x-show="selectedCategory"
-                                class="bg-black bg-opacity-50 ml-3 px-3 py-1 rounded-full text-sm">
+                                class="bg-black bg-opacity-50 ml-3 px-3 py-1 rounded-full text-sm mobile-truncate basis-1/3">
                                 <span x-text="getCurrentCategoryName()"></span>
                             </div>
                         </div>
@@ -743,6 +770,7 @@
                 mediaSourceOverlayTransition: null, // Store transition timeout
                 mouseX: 0,
                 mouseY: 0,
+                isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
                 get currentItem() {
                     return this.items[this.currentIndex] || null;
                 },
@@ -990,6 +1018,15 @@
 
                     // Add touch event for mobile
                     imageContainer.addEventListener('touchstart', () => {
+                        // Don't show media source overlay on mobile
+                        if (this.mediaSourceOverlayTimeout) {
+                            clearTimeout(this.mediaSourceOverlayTimeout);
+                        }
+                        if (this.mediaSourceOverlayTransition) {
+                            clearTimeout(this.mediaSourceOverlayTransition);
+                        }
+                        this.showMediaSourceOverlay = false;
+
                         this.showControls();
                         this.resetInactivityTimer();
                     });
@@ -1533,6 +1570,12 @@
 
                 // Show temporary media source overlay
                 showTemporaryMediaSourceOverlay() {
+                    // Check if we're on a mobile device
+                    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                    if (isMobile) {
+                        return; // Don't show overlay on mobile
+                    }
+
                     // Clear any existing timeouts
                     if (this.mediaSourceOverlayTimeout) {
                         clearTimeout(this.mediaSourceOverlayTimeout);
