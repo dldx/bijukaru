@@ -1,9 +1,11 @@
 import requests
+import random
 from pydantic import BaseModel, Field, AliasPath, AliasChoices
 from typing import Any, Optional
 from schema import FeedItem, Category, Feed
 import re
 from functools import lru_cache
+from urllib.parse import quote as urlquote
 
 class WikiArtArtwork(BaseModel):
     title: str
@@ -129,8 +131,18 @@ def get_popular_artists() -> list[str]:
 
 @lru_cache(maxsize=1024)
 def get_wikiart_feed(category: str, hd: bool = False) -> Feed:
-    """Fetch artworks for a specific artist from WikiArt."""
-    import random
+    """Fetch artworks for a specific artist from WikiArt.
+
+    Args:
+        category: The category to fetch artworks for. If the category is "most-viewed", the feed will contain the most viewed artworks. If the category starts with "artist:", the feed will contain the artworks for the artist with the given slug. If the category starts with "style:", the feed will contain the artworks for the style with the given slug. If the category starts with "search:", the feed will contain the artworks for the search query.
+        hd: Whether to get high-definition images.
+
+    Returns:
+        A Feed instance containing the artworks.
+    """
+
+    if category.startswith("search:"):
+        return search_wikiart(category.replace("search:", ""))
 
     url = "https://www.wikiart.org"
     if category == "most-viewed":
@@ -213,6 +225,91 @@ def get_wikiart_feed(category: str, hd: bool = False) -> Feed:
     return Feed(
         items=items,
         category=WikiArtCategory(id=category, name=category_name),
+    )
+
+
+def search_wikiart_for_artists(artists: list[str]) -> list[WikiArtCategory]:
+    """Search for artworks on WikiArt for a specific artist."""
+    categories = []
+    for artist in artists:
+        url = f"https://www.wikiart.org/en/Search/{urlquote(artist)}?json=2&layout=new&limit=100&resultType=masonry"
+        response = requests.get(url)
+        if response.status_code != 200:
+            raise Exception(
+                f"Failed to fetch WikiArt feed for artist {artist}. Status code: {response.status_code}"
+            )
+        response_data = response.json()
+        if "Artists" not in response_data:
+            raise Exception(
+                f"Expected 'Artists' key in response for search query {artist}"
+            )
+        artist_response = response_data["Artists"]
+        if artist_response is not None:
+            categories.append(
+                WikiArtCategory(
+                    id="artist:" + artist_response[0]["url"].split("/")[-1],
+                    name=artist_response[0]["title"],
+                )
+            )
+    return categories
+
+
+@lru_cache(maxsize=1024)
+def search_wikiart(query: str) -> Feed:
+    """Search for artworks on WikiArt.
+
+    Args:
+        query: The query to search for. This should be a specific artist name, style, or a couple of words that describe the artwork. The query should be concise and to the point. Instead of "paintings of London", use "london" as the query.
+               If you want to search for multiple artists, separate the artist names with | in the query.
+
+    Returns:
+        A Feed instance containing the artworks.
+    """
+    if "|" in query:
+        queries = query.split("|")
+    else:
+        queries = [query]
+
+    artworks = []
+    for _query in queries:
+        url = f"https://www.wikiart.org/en/Search/{urlquote(_query)}?json=2&layout=new&limit=100&resultType=masonry"
+        response = requests.get(url)
+        if response.status_code != 200:
+            raise Exception(
+                f"Failed to fetch WikiArt feed for artist {_query}. Status code: {response.status_code}"
+            )
+        response_data = response.json()
+        if "Paintings" not in response_data:
+            raise Exception(
+                f"Expected 'Paintings' key in response for search query {_query}"
+            )
+
+        if response_data["Paintings"] is None:
+            artworks += []
+        else:
+            artworks += [
+                WikiArtArtwork.model_validate(artwork)
+                for artwork in response_data["Paintings"]
+            ]
+    return Feed(
+        items=[
+            FeedItem(
+                id=str(artwork.contentId),
+                title=(
+                    f"{artwork.title} ({artwork.yearAsString}) | {artwork.artistName}"
+                    if artwork.yearAsString
+                    else artwork.title
+                ),
+                description="",
+                image_url=artwork.image_url,
+                link=artwork.link,
+                artist_name=artwork.artistName,
+            )
+            for artwork in artworks
+        ],
+        category=WikiArtCategory(
+            id=f"search:{query}", name=f"Search results for '{query}'"
+        ),
     )
 
 

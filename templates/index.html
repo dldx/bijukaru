@@ -1875,20 +1875,114 @@
                         const response = await fetch(`/api/search?query=${encodeURIComponent(this.searchQuery)}`);
                         const result = await response.json();
 
-                        if (response.ok && result.url) {
-                            console.log("Search successful, redirecting to:", result.url);
-
-                            // Add userfriendly_message as a URL parameter for the target page
-                            let targetUrl = result.url;
-                            if (result.userfriendly_message) {
-                                const urlObj = new URL(window.location.origin + targetUrl);
-                                urlObj.searchParams.append('message', encodeURIComponent(result.userfriendly_message));
-                                targetUrl = urlObj.pathname + urlObj.search;
-                            }
-
-                            // Close search overlay and redirect
+                        if (response.ok) {
+                            // Close search overlay immediately
                             this.closeSearchOverlay();
-                            window.location.assign(targetUrl);
+
+                            // Check if we received direct feed results
+                            if (result.feed && result.source) {
+                                console.log("Search successful, received direct feed results");
+
+                                // Switch to the appropriate media source if needed
+                                if (result.source !== this.selectedMediaSource) {
+                                    this.selectedMediaSource = result.source;
+                                    await this.loadCategories();
+                                }
+
+                                // Create a virtual search results category if it doesn't exist
+                                const searchCategory = { id: "search-results", name: "Search Results" };
+                                if (!this.categories.some(c => c.id === "search-results")) {
+                                    this.categories.push(searchCategory);
+                                }
+
+                                // Switch to search results category
+                                this.selectedCategory = "search-results";
+                                this.categoryIndex = this.categories.findIndex(c => c.id === "search-results");
+
+                                // Replace the items with search results
+                                this.items = result.feed.items;
+                                this.currentIndex = 0;
+
+                                // Show message if provided
+                                if (result.userfriendly_message) {
+                                    this.overlayMessage = result.userfriendly_message;
+                                    this.showMessageOverlay = true;
+                                    setTimeout(() => {
+                                        this.showMessageOverlay = false;
+                                    }, 5000);
+                                }
+
+                                // Update URL for bookmarking
+                                window.history.pushState({}, '', result.url);
+
+                                // Update title and start slideshow
+                                this.updateDocumentTitle();
+                                this.startAutoSlide();
+                            }
+                            // Handle URL-based results (existing functionality)
+                            else if (result.url) {
+                                console.log("Search successful, received URL:", result.url);
+
+                                // Parse the URL to extract parameters
+                                const urlObj = new URL(window.location.origin + result.url);
+                                const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+                                const searchParams = urlObj.searchParams;
+
+                                // Extract media source from the path
+                                let newMediaSource = pathSegments[0] || this.selectedMediaSource;
+                                const hdParam = searchParams.get('hd') === 'true';
+                                const categoryParam = searchParams.get('category');
+                                const imageIdParam = searchParams.get('image_id');
+
+                                // Show message if provided
+                                if (result.userfriendly_message) {
+                                    this.overlayMessage = result.userfriendly_message;
+                                    this.showMessageOverlay = true;
+                                    setTimeout(() => {
+                                        this.showMessageOverlay = false;
+                                    }, 5000);
+                                }
+
+                                // Apply search results by updating component state
+                                let mediaSourceChanged = false;
+
+                                // Change media source if needed
+                                if (newMediaSource !== this.selectedMediaSource) {
+                                    this.selectedMediaSource = newMediaSource;
+                                    mediaSourceChanged = true;
+
+                                    // Load categories for the new media source
+                                    await this.loadCategories();
+                                }
+
+                                // Update HD settings if specified
+                                if (hdParam !== undefined) {
+                                    this.isHD = hdParam;
+                                }
+
+                                // Update category if specified
+                                if (categoryParam) {
+                                    this.selectedCategory = categoryParam;
+                                    // Find index of this category
+                                    this.categoryIndex = Math.max(0, this.categories.findIndex(c => c.id === categoryParam));
+                                }
+
+                                // Set target image ID to jump to after loading
+                                if (imageIdParam) {
+                                    this.targetImageId = imageIdParam;
+                                }
+
+                                // Load the appropriate content
+                                await this.loadCategory();
+
+                                // Update the URL without refreshing
+                                window.history.pushState({}, '', result.url);
+
+                                // Update document title
+                                this.updateDocumentTitle();
+                            } else {
+                                throw new Error('Search returned invalid results');
+                            }
                         } else {
                             throw new Error(result.error || 'Search failed');
                         }

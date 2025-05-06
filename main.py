@@ -10,7 +10,7 @@ from datetime import datetime
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
-from apod import get_apod_categories, get_apod_feed
+from apod import get_apod_categories, get_apod_feed, search_apod
 from thisiscolossal import get_thisiscolossal_categories, get_thisiscolossal_feed
 from ukiyoe import get_ukiyo_e_feed, get_ukiyo_e_categories
 from guardian_photos import get_guardian_categories, get_guardian_photos_feed
@@ -96,8 +96,11 @@ async def _get_apod_categories():
 
 @app.get("/api/apod/feed", response_model=Feed)
 @cache(expire=600)  # Cache for 10 minutes
-async def _get_apod_feed(category: str = "2025", hd: bool = False):
-    return await get_apod_feed(category, hd)
+async def _get_apod_feed(category: str = "2025", hd: bool = False) -> Feed:
+    if category.startswith("search:"):
+        return await search_apod(category.replace("search:", ""), hd)
+    else:
+        return await get_apod_feed(year=category, hd=hd)
 
 
 @app.get("/api/ukiyo-e/categories", response_model=List[Category])
