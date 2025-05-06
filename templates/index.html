@@ -1105,6 +1105,15 @@
 
                     // Add keyboard event listeners
                     document.addEventListener('keydown', (e) => {
+                        // If search overlay is open, only process Escape key and ignore all other shortcuts
+                        if (this.showSearchOverlay) {
+                            if (e.key === 'Escape') {
+                                this.closeSearchOverlay();
+                            }
+                            return;
+                        }
+
+                        // Process normal shortcuts when search is closed
                         if (e.key === 'Escape' && this.isFullscreen) {
                             this.exitFullscreen();
                         } else if (e.key === 'ArrowLeft') {
