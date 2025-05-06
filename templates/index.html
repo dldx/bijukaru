@@ -348,6 +348,58 @@
                 display: none;
             }
         }
+        /* Search overlay */
+        .search-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.85);
+            color: white;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Center vertically */
+            align-items: center;
+            padding: 2rem;
+        }
+        .search-content {
+            background-color: #1e1e1e; /* Dark surface */
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 500px; /* Limit width */
+            width: 100%;
+            position: relative; /* For close button */
+        }
+        .search-overlay input[type="text"] {
+            color: #121212; /* Dark text for input */
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
+            border: 1px solid #555;
+            margin-bottom: 1rem;
+        }
+        .search-overlay button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .search-overlay .search-button {
+            background-color: #3b82f6; /* Blue */
+            color: white;
+            border: none;
+        }
+         .search-overlay .close-button {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
     </style>
     </head>
     <body
@@ -410,6 +462,10 @@
                                 <td><span class="key">H</span></td>
                                 <td>Toggle help (this screen)</td>
                             </tr>
+                            <tr>
+                                <td><span class="key">/</span></td>
+                                <td>Open search</td>
+                            </tr>
                         </tbody>
                     </table>
 
@@ -423,6 +479,25 @@
             <div x-show="error"
                 class="relative bg-red-100 dark:bg-red-900 mb-4 px-4 py-3 border border-red-400 dark:border-red-700 rounded text-red-700 dark:text-red-300">
                 <span x-text="error"></span>
+            </div>
+
+            <!-- Search Overlay -->
+            <div x-show="showSearchOverlay" class="search-overlay"
+                 @click.self="closeSearchOverlay()" @keydown.escape.window="closeSearchOverlay()">
+                <div class="search-content" @click.stop>
+                    <button @click="closeSearchOverlay()" class="close-button" aria-label="Close search">×</button>
+                    <h3 class="mb-4 font-semibold text-xl text-center">Search Gallery</h3>
+                     <input type="text" x-model="searchQuery" @keydown.enter="performSearch"
+                           placeholder="e.g., Van Gogh starry night, APOD today, Reddit cats..."
+                           class="bg-white dark:bg-gray-200 text-gray-900" x-ref="searchInput">
+                     <div class="flex justify-center">
+                        <button @click="performSearch" class="search-button">
+                            <span x-show="!loading">Search</span>
+                            <span x-show="loading">Searching...</span>
+                        </button>
+                     </div>
+                     <div x-show="error" class="mt-4 text-red-400 text-center" x-text="error"></div>
+                </div>
             </div>
 
             <!-- Gallery -->
@@ -639,6 +714,14 @@
 
                     <!-- Clustered controls group -->
                     <div class="flex justify-center items-center space-x-1 md:space-x-2">
+                        <!-- Search Button (Triggers Overlay) -->
+                        <button @click="openSearchOverlay()" title="Search ( / )"
+                                class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none text-gray-600 dark:text-gray-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+
                         <!-- Pause/Resume button -->
                         <button
                             @click="togglePause"
@@ -794,6 +877,8 @@
                 mouseX: 0,
                 mouseY: 0,
                 isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+                searchQuery: "", // Store the search query
+                showSearchOverlay: false, // Control search overlay visibility
                 get currentItem() {
                     return this.items[this.currentIndex] || null;
                 },
@@ -1032,6 +1117,12 @@
                         } else if (e.key === 'p' || e.key === 'P') {
                             // Toggle pause/resume with 'p' key
                             this.togglePause();
+                        } else if (e.key === '/' && !e.metaKey && !e.ctrlKey) {
+                            // Open search overlay with '/' key, ignore if inside input
+                            if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                                e.preventDefault(); // Prevent typing '/' in other inputs
+                                this.openSearchOverlay();
+                            }
                         }
 
                         // Any key press resets inactivity timer
@@ -1716,6 +1807,49 @@
                 refreshRandomArtist() {
                     if (this.selectedCategory === 'random-artist') {
                         this.loadCategory();
+                    }
+                },
+
+                // Open search overlay
+                openSearchOverlay() {
+                    this.showSearchOverlay = true;
+                    this.error = null; // Clear previous errors
+                    // Use $nextTick to ensure the element is visible before focusing
+                    this.$nextTick(() => {
+                        this.$refs.searchInput.focus();
+                    });
+                },
+
+                // Close search overlay
+                closeSearchOverlay() {
+                    this.showSearchOverlay = false;
+                    this.searchQuery = ""; // Clear query on close
+                    this.error = null; // Clear errors on close
+                },
+
+                // Perform search
+                async performSearch() {
+                    if (!this.searchQuery.trim()) return;
+
+                    this.loading = true;
+                    this.error = null;
+
+                    try {
+                        const response = await fetch(`/api/search?query=${encodeURIComponent(this.searchQuery)}`);
+                        const result = await response.json();
+
+                        if (response.ok && result.url) {
+                            console.log("Search successful, redirecting to:", result.url);
+                            // Use window.location.assign for full page navigation
+                            window.location.assign(result.url);
+                            // Clear search query and close overlay after successful redirect initiation
+                            this.closeSearchOverlay();
+                        } else {
+                            throw new Error(result.error || 'Search failed');
+                        }
+                    } catch (err) {
+                        console.error('Search error:', err);
+                        this.error = err.message || 'An error occurred during the search.';
                     }
                 }
             };

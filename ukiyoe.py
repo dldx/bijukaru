@@ -11,6 +11,10 @@ def get_ukiyo_e_categories() -> list[Category]:
     # Sort categories by number of images
     categories = sorted(categories, key=lambda x: int(re.search(r'[\d,]+', x["Image Count"]).group().replace(",", "")), reverse=True)
     categories = [Category(id=category["Browse Link"].split("/")[-1], name=category["Museum Name"]) for category in categories]
+    categories += [
+        Category(id="artist:" + "katsushika-hokusai", name="Katsushika Hokusai"),
+        Category(id="artist:" + "yoshida-hiroshi", name="Yoshida Hiroshi"),
+    ]
     return categories
 
 def cluster_items(data_array: list[any], category: str | None) -> list[FeedItem]:
@@ -56,12 +60,13 @@ def cluster_items(data_array: list[any], category: str | None) -> list[FeedItem]
 
 
 def get_ukiyo_e_feed(category: str, start: int = 1) -> Feed:
-    if category in [cat.id for cat in get_ukiyo_e_categories()]:
+    if not category.startswith("artist:"):
         url = f"https://ukiyo-e.org/source/{category}.data?start={start}"
         cluster_category = category
     else:
         ## Asume category is actually an artist name
-        url = f"https://ukiyo-e.org/artist/{category}.data?start={start}"
+        url = f"https://ukiyo-e.org/artist/{category.removeprefix('artist:')}.data?start={start}"
+        category = category.removeprefix("artist:")
         cluster_category = None
     response = requests.get(url, allow_redirects=True)
     json_data = orjson.loads(response.content.decode("utf-8"))
