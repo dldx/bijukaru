@@ -18,7 +18,7 @@ from reddit import get_reddit_feed, get_reddit_categories
 from wikiart import get_popular_artists, get_wikiart_feed, get_wikiart_categories
 
 # Import for structured search
-from gemini_structured_output import get_structured_params
+from llm_research import get_structured_params
 from models import BijukaruUrlParams
 
 from schema import FeedItem, Category, Feed
@@ -167,13 +167,18 @@ async def _get_wikiart_feed(
 
 
 @app.get("/api/search")
-async def search_gallery(query: str):
+async def search_gallery(query: str) -> JSONResponse:
     """
     Parses a natural language query to generate gallery parameters and returns a relative URL.
     """
     structured_params: Optional[BijukaruUrlParams] = await get_structured_params(query)
     if structured_params and structured_params.url:
-        return JSONResponse(content={"url": structured_params.url})
+        return JSONResponse(
+            content={
+                "url": structured_params.url,
+                "userfriendly_message": structured_params.userfriendly_message,
+            }
+        )
     else:
         # You might want to return a more specific error message
         # based on why structured_params is None or has no URL.

@@ -15,12 +15,12 @@ Requires:
 import asyncio
 import os
 from typing import List, Dict, Optional
-from pydantic_ai import Agent
+from pydantic_ai import Agent, RunContext
 from pydantic import BaseModel, Field
 import dotenv
+from models import get_all_categories, BijukaruUrlParams
 
 dotenv.load_dotenv()
-
 
 class ResearchResult(BaseModel):
     """
@@ -28,37 +28,139 @@ class ResearchResult(BaseModel):
     gallery parameters for user requests that don't directly match existing categories.
     """
 
-    category_suggestions: List[Dict[str, str]] = Field(
+    research_query: str = Field(
         ...,
-        description="List of suggested categories in the format {id: 'category_id', name: 'Display Name'}. "
-        "The id should follow the format required by the media source, such as 'artist:sidney-nolan' for WikiArt artists.",
+        description="The research query from the user.",
+        examples=["Show me Ukiyo-e artists from the 20th century"],
+    )
+    research_result: str = Field(
+        ...,
+        description="A concise research result from the LLM.",
         examples=[
-            [
-                {"id": "artist:sidney-nolan", "name": "Sidney Nolan"},
-                {"id": "artist:brett-whiteley", "name": "Brett Whiteley"},
-            ]
+            """Here is a concise list of some prominent artists associated with the Shin-hanga movement in the 20th century:
+
+Kawase Hasui (1883-1957)
+Yoshida Hiroshi (1876-1950)
+Ito Shinsui (1898-1972)
+Hashiguchi Goyō (1880-1921)
+Ohara Koson (Shōson) (1877-1945)
+Tsuchiya Koitsu (1870-1949)
+Natori Shunsen (1886-1960)"""
         ],
     )
 
-    explanation: str = Field(
-        ...,
-        description="Brief explanation of why these categories were suggested based on the user's query.",
-        examples=[
-            "These are prominent Australian artists known for their contributions to modern art."
-        ],
+
+class SuggestedBijukaruUrlParams(BijukaruUrlParams):
+    """
+    Represents a suggested gallery parameters from the LLM.
+    """
+
+    llm_thinking: str = Field(
+        description="Explain your reasoning for the category and image_id you chose. This will be shown to the user.",
     )
+    userfriendly_message: str = Field(
+        description="A user-friendly message to the user explaining the gallery parameters you chose.",
+    )
+
+
+# Define the agent
+# Note: We define the agent *before* decorating the tool function
+agent = Agent(
+    "google-gla:gemini-2.0-flash",  # Using flash for speed/cost, consider 'gemini-1.5-pro'
+    output_type=SuggestedBijukaruUrlParams,
+    system_prompt=(
+        "Extract the gallery parameters from the user's request "
+        "and structure them according to the BijukaruUrlParams model. "
+        "Infer the 'media_source' based on the context if not explicitly stated. "
+        "Default 'media_source' to 'wikiart' if ambiguous. "
+        "Identify specific image IDs, categories (like artists, styles, years, subreddits), "
+        "slideshow interval, and other boolean flags or numeric settings mentioned. "
+        "If you are unsure about a category, cannot find a specific ID, or if the user asks for suggestions, "
+        "use the `perform_research` tool to get category suggestions based on the query. "
+        "Once the tool provides suggestions, use the most relevant one to populate the parameters. "
+        "You may also infer additional categories based on your own knowledge, returning the category ids in the correct format. You do not need to stick only to the examples in the case of wikiart, reddit or ukiyo-e media sources."
+        "For example, if the user asks for 'katsushika hokusai', you should infer the category id as 'artist:katsushika-hokusai'."
+        "If the user asks for a subreddit suggestion, you should infer the category id as 'subreddit:<subredditname>', for example 'subreddit:foxes'. The subreddit can be any subreddit, not just the ones in the examples. The subreddit should exist."
+        "Make sure the category_id and image_id are in the correct format for the media source. "
+        "For example:"
+        "\n- WikiArt artists: 'artist:artist-name-slug'"
+        "\n- WikiArt styles: 'style:style-name-slug'"
+        "\n- Reddit: 'subreddit-name' (without 'r/')"
+        "\n- Ukiyo-e artists: 'artist:artist-name-slug'"
+        "Make sure you return the correct values for the category_id and image_id. "
+        "Explain your reasoning for the category and image_id you chose."
+        "Make sure the userfriendly_message is a user-friendly message to the user explaining the gallery parameters you chose, particularly the choice of category_id and image_id."
+        f"These are some of the categories for the media sources: {get_all_categories()}"
+    ),
+    instrument=True,  # Optional: Enable instrumentation for logging/debugging
+)
+
+
+# Register perform_research as a tool using the decorator
+@agent.tool_plain
+async def perform_research_tool(query: str) -> Optional[ResearchResult]:
+    """
+    Use your own knowledge to find relevant categories for the query.
+    """
+    print(f"--- Tool: Running research for query: {query} ---")
+    result = await perform_research(query)
+    print(f"--- Tool: Research result: {result} ---")
+    return result
+
+
+async def get_structured_params(query: str) -> Optional[SuggestedBijukaruUrlParams]:
+    """
+    Uses pydantic-ai Agent with Gemini to parse a query into BijukaruUrlParams.
+    The agent can use the 'perform_research_tool' if needed.
+
+    Args:
+        query: The natural language query describing the desired gallery parameters.
+
+    Returns:
+        A BijukaruUrlParams instance populated from the query, or None if an error occurs.
+    """
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        print("Error: GEMINI_API_KEY environment variable not set.")
+        print(
+            "Please get an API key from https://aistudio.google.com/apikey and set the variable."
+        )
+        return None
+
+    print(f"Query: {query}")
+
+    try:
+        # Use agent.run() for async execution
+        # The agent will automatically use the 'perform_research_tool' if its logic determines it's necessary based on the prompt.
+        result = await agent.run(query)
+        print("--- Agent Result ---")
+        if result.output:
+            print("Structured Output:")
+            print(result.output.model_dump_json(indent=2))
+            print("\nUsage:")
+            print(result.usage())
+            return result.output
+        else:
+            print("Agent did not produce valid structured output.")
+            print("Messages:", result.all_messages())
+            return None
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return None
 
 
 async def perform_research(query: str) -> Optional[ResearchResult]:
     """
-    Uses pydantic-ai Agent with Gemini to perform open-ended research on queries
-    that don't directly match existing categories.
+    Uses LLM knowledge to perform open-ended research on queries that don't directly match existing categories.
 
     Args:
         query: The user's research query, e.g., "Show me Australian artists"
 
     Returns:
-        ResearchResult with category suggestions, or None if an error occurs
+        ResearchResult with research result, or None if an error occurs
     """
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -69,9 +171,7 @@ async def perform_research(query: str) -> Optional[ResearchResult]:
         return None
 
     # Using google-gla provider with Gemini model
-    model_name = (
-        "google-gla:gemini-2.0-flash"  # Using Pro for better research capabilities
-    )
+    model_name = "google-gla:gemini-2.0-flash"
 
     # Define the agent
     agent = Agent(
@@ -79,28 +179,15 @@ async def perform_research(query: str) -> Optional[ResearchResult]:
         output_type=ResearchResult,
         system_prompt=(
             "You are a research assistant specializing in art, photography, and other visual media. "
-            "Your task is to analyze the user's query and suggest appropriate categories or specific "
-            "content that would match what they're looking for. "
+            "Your task is to analyze the user's query and provide a concise research result. "
             "\n\n"
             "For example:"
-            "\n- If they ask for 'Australian artists', suggest specific Australian artists "
-            "formatted for WikiArt (e.g., 'artist:sidney-nolan')"
-            "\n- If they ask for a specific photography style or requests that don't fit into the other categories, suggest subreddits "
+            "\n- If they ask for 'Australian artists', provide a concise list of Australian artists "
+            "\n- If they ask for a specific photography style or requests that don't fit into the other categories, provide a concise list of subreddits "
             "that might contain that style"
-            "\n- If they ask about Japanese woodblock print artists, suggest Ukiyo-e artists "
-            "formatted appropriately (e.g., 'artist:katsushika-hokusai')"
+            "\n- If they ask about Japanese woodblock print artists, provide a concise list of Ukiyo-e artists "
             "\n\n"
-            "Focus on providing accurate category IDs that match the expected format for the "
-            "most appropriate media source. Prefer WikiArt for fine art queries, Reddit for "
-            "photography, games, or niche art queries, and Ukiyo-e for Japanese woodblock prints."
-            "\n\n"
-            "Provide a brief explanation of why you suggested these categories."
-            "\n\n"
-            "Make sure the category_id values follow the expected format:"
-            "\n- WikiArt artists: 'artist:artist-name-slug'"
-            "\n- WikiArt styles: 'style:style-name-slug'"
-            "\n- Reddit: 'subreddit-name' (without 'r/')"
-            "\n- Ukiyo-e artists: 'artist:artist-name-slug'"
+            "Focus on providing accurate research."
         ),
         instrument=True,  # Enable instrumentation for logging
     )
@@ -126,23 +213,22 @@ async def perform_research(query: str) -> Optional[ResearchResult]:
         print(f"An unexpected error occurred during research: {e}")
         return None
 
-
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Perform open-ended research on visual media queries."
+        description="Extract structured gallery parameters from a natural language query."
     )
-    parser.add_argument("query", type=str, help="The research query to process.")
+    parser.add_argument("query", type=str, help="The natural language query to parse.")
     args = parser.parse_args()
 
-    # Run the example
-    research_result = asyncio.run(perform_research(args.query))
+    # --- Run the example ---
+    # Use asyncio.run() to execute the async function
+    structured_output: Optional[SuggestedBijukaruUrlParams] = asyncio.run(
+        get_structured_params(args.query)
+    )
 
-    if research_result:
-        print("\nSuggested categories:")
-        for category in research_result.category_suggestions:
-            print(f"- {category['name']} (ID: {category['id']})")
-        print(f"\nExplanation: {research_result.explanation}")
+    if structured_output:
+        print(f"Generated URL: {structured_output.url}")
     else:
-        print("\nFailed to get research results.")
+        print("\nFailed to get structured output.")

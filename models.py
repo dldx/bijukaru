@@ -25,9 +25,6 @@ class BijukaruUrlParams(BaseModel):
     # Remove ClassVar definition
     # MEDIA_SOURCE_TYPE: ClassVar[type] = MEDIA_SOURCE_LITERAL
 
-    llm_thinking: str = Field(
-        description="Explain your reasoning for the category and image_id you chose. This will be shown to the user.",
-    )
     media_source: MEDIA_SOURCE_LITERAL = Field(
         ...,
         description="The primary source of the media content. Select one of the available predefined source IDs.",
