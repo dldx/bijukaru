@@ -7,6 +7,8 @@ import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 from typing import List, Literal, Optional
 from datetime import datetime
+import hmac
+import os
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from fastapi_cache.decorator import cache
@@ -16,6 +18,8 @@ from ukiyoe import get_ukiyo_e_feed, get_ukiyo_e_categories
 from guardian_photos import get_guardian_categories, get_guardian_photos_feed
 from reddit import get_reddit_feed, get_reddit_categories
 from wikiart import get_popular_artists, get_wikiart_feed, get_wikiart_categories
+from dotenv import load_dotenv
+
 
 # Import for structured search
 from llm_research import get_structured_params
@@ -24,9 +28,12 @@ from models import BijukaruUrlParams
 from schema import FeedItem, Category, Feed
 
 FastAPICache.init(InMemoryBackend(), prefix="bijukaru")
+load_dotenv()
 
 app = FastAPI()
 
+if os.getenv("SEARCH_TOKEN") is None:
+    raise ValueError("SEARCH_TOKEN is not set in the environment variables")
 
 # Set up templates
 templates = Jinja2Templates(directory="templates")
@@ -169,11 +176,38 @@ async def _get_wikiart_feed(
     return response
 
 
+@app.get("/api/verify_token")
+async def verify_token(token: str) -> JSONResponse:
+    """
+    Verify if the provided token is correct for accessing the search functionality.
+    Uses constant time comparison to prevent timing attacks.
+    """
+    # Use constant time comparison to prevent timing attacks
+    is_correct = hmac.compare_digest(token, os.getenv("SEARCH_TOKEN"))
+
+    if is_correct:
+        return JSONResponse(content={"authorized": True, "message": "Token accepted"})
+    else:
+        # Don't provide too specific error messages for security
+        return JSONResponse(
+            content={"authorized": False, "error": "Invalid token"}, status_code=401
+        )
+
+
+# Update search endpoint to require token
 @app.get("/api/search")
-async def search_gallery(query: str) -> JSONResponse:
+async def search_gallery(query: str, token: Optional[str] = None) -> JSONResponse:
     """
     Parses a natural language query to generate gallery parameters and returns a relative URL.
+    Requires a valid token for access.
     """
+    # Verify token first
+    if not token or not hmac.compare_digest(token, os.getenv("SEARCH_TOKEN")):
+        return JSONResponse(
+            content={"error": "Unauthorized. Valid token required for search."},
+            status_code=401,
+        )
+
     structured_params: Optional[BijukaruUrlParams] = await get_structured_params(query)
     if structured_params and structured_params.url:
         return JSONResponse(

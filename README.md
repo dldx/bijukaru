@@ -6,6 +6,7 @@ This is a carousel gallery for art images, supporting multiple media sources inc
 
 - **Multiple Media Sources**: Switch between different content providers (This is Colossal, Astronomy Picture of the Day, Ukiyo-e.org, Guardian, Reddit, WikiArt)
 - **Content Categories**: Filter gallery content by categories (including popular artists for WikiArt)
+- **Search Functionality**: Search across all media sources using natural language queries (search is disabled by default, requires authentication token to account for LLM costs)
 - **Automatic Slideshow**: Images change automatically with a configurable interval (can be disabled)
 - **Visual Progress Bar**: Shows timing between slide transitions
 - **Image Prefetching**: Preloads upcoming images for smoother transitions
@@ -37,15 +38,29 @@ Visit [https://frames.dldx.org](https://frames.dldx.org) to see the gallery in a
 - `prefetch`: Set number of images to preload (e.g., `?prefetch=5` to prefetch 5 upcoming images)
 - `fullscreen`: Start in fullscreen mode (e.g., `?fullscreen=true`)
 - `showDescription`: Show image descriptions by default (e.g., `?showDescription=true`)
+- `token`: Provide authentication token for search functionality (e.g., `?token=yoursecrettoken`)
 
 ### Keyboard Navigation
 
 - **Left/Right Arrow Keys**: Navigate between images
 - **Up/Down Arrow Keys**: Navigate between categories
+- **Page Up/Down Keys**: Navigate between media sources
 - **F Key**: Toggle fullscreen mode
 - **D Key**: Toggle description visibility
-- **Escape Key**: Exit fullscreen mode
+- **P Key**: Pause/resume slideshow
+- **/ Key**: Open search interface
+- **H Key**: Display help with all keyboard shortcuts
+- **Escape Key**: Exit fullscreen mode or close search overlay
 - **Enter Key**: Open original article in new tab
+
+### Search Functionality
+
+The search feature allows you to find content across all media sources using natural language queries:
+
+1. Authenticate by adding `?token=yoursecrettoken` to the URL once
+2. After authentication, the search icon appears in the control bar
+3. Click the search icon or press `/` to open the search interface
+4. Type queries like "Van Gogh starry night", "show me photos of supernovae", or "analog art"
 
 ## Embedding on other websites
 
@@ -59,6 +74,12 @@ For additional customization, you can use URL parameters:
 
 ```html
 <iframe src="https://frames.dldx.org?category=photography&interval=8&prefetch=3&image_id=1234abcd&fullscreen=true&showDescription=true" width="100%" height="500px"></iframe>
+```
+
+To enable search functionality, include the token parameter once:
+
+```html
+<iframe src="https://frames.dldx.org?token=yoursecrettoken" width="100%" height="500px"></iframe>
 ```
 
 You can also specify a particular media source:
@@ -117,9 +138,14 @@ Or browse WikiArt artists:
 ```
 ```custom-frames
 frame: Bijukaru
-url: https://frames.dldx.org/wikiart?category=frida-kahlo
+url: https://frames.dldx.org/wikiart?category=artist:frida-kahlo
 style: background-color: unset; height: 800px;```
 ```
 
-
-
+To enable search in Obsidian, add the token to the URL:
+```
+```custom-frames
+frame: Bijukaru
+url: https://frames.dldx.org?token=yoursecrettoken
+style: background-color: unset; height: 800px;```
+```
