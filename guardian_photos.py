@@ -3,14 +3,13 @@ import requests
 from schema import FeedItem, Category, Feed
 from functools import lru_cache
 from typing import Any
-
+from datetime import datetime
 
 class GuardianCategory(Category):
     def model_post_init(self, context: Any) -> None:
         self.link = f"https://www.theguardian.com/{self.id}"
 
 
-@lru_cache(maxsize=1)
 def get_guardian_categories() -> list[GuardianCategory]:
     url = "https://www.theguardian.com/news/series/ten-best-photographs-of-the-day/rss"
     response = requests.get(url)
@@ -35,6 +34,7 @@ def get_guardian_categories() -> list[GuardianCategory]:
     return categories
 
 
+@lru_cache(maxsize=1024)
 def get_guardian_photos_feed(category: str) -> Feed:
     url = f"https://www.theguardian.com/{category}"
     response = requests.get(url)

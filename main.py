@@ -19,18 +19,32 @@ from guardian_photos import get_guardian_categories, get_guardian_photos_feed
 from reddit import get_reddit_feed, get_reddit_categories
 from wikiart import get_popular_artists, get_wikiart_feed, get_wikiart_categories
 from dotenv import load_dotenv
-
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
 
 # Import for structured search
 from llm_research import get_structured_params
 from models import BijukaruUrlParams
 
-from schema import FeedItem, Category, Feed
+from schema import Category, Feed
 
-FastAPICache.init(InMemoryBackend(), prefix="bijukaru")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    if redis_url := os.getenv("REDIS_URL"):
+        from redis import asyncio as aioredis
+        from fastapi_cache.backends.redis import RedisBackend
+
+        redis = aioredis.from_url(redis_url)
+        FastAPICache.init(RedisBackend(redis), prefix="bijukaru")
+    else:
+        FastAPICache.init(InMemoryBackend(), prefix="bijukaru")
+    yield
+
+
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 if os.getenv("SEARCH_TOKEN") is None:
     raise ValueError("SEARCH_TOKEN is not set in the environment variables")
@@ -194,8 +208,8 @@ async def verify_token(token: str) -> JSONResponse:
         )
 
 
-# Update search endpoint to require token
 @app.get("/api/search")
+@cache(expire=60 * 60 * 24)  # Cache for 1 day
 async def search_gallery(query: str, token: Optional[str] = None) -> JSONResponse:
     """
     Parses a natural language query to generate gallery parameters and returns a relative URL.
