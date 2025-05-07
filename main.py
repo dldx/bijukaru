@@ -19,8 +19,6 @@ from guardian_photos import get_guardian_categories, get_guardian_photos_feed
 from reddit import get_reddit_feed, get_reddit_categories
 from wikiart import get_popular_artists, get_wikiart_feed, get_wikiart_categories
 from dotenv import load_dotenv
-from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 # Import for structured search
 from llm_research import get_structured_params
@@ -29,22 +27,18 @@ from models import BijukaruUrlParams
 from schema import Category, Feed
 
 
-@asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    if redis_url := os.getenv("REDIS_URL"):
-        from redis import asyncio as aioredis
-        from fastapi_cache.backends.redis import RedisBackend
-
-        redis = aioredis.from_url(redis_url)
-        FastAPICache.init(RedisBackend(redis), prefix="bijukaru")
-    else:
-        FastAPICache.init(InMemoryBackend(), prefix="bijukaru")
-    yield
-
-
 load_dotenv()
+if redis_url := os.getenv("REDIS_URL"):
+    from redis import asyncio as aioredis
+    from fastapi_cache.backends.redis import RedisBackend
 
-app = FastAPI(lifespan=lifespan)
+    redis = aioredis.from_url(redis_url)
+    FastAPICache.init(RedisBackend(redis), prefix="bijukaru")
+else:
+    FastAPICache.init(InMemoryBackend(), prefix="bijukaru")
+
+
+app = FastAPI()
 
 if os.getenv("SEARCH_TOKEN") is None:
     raise ValueError("SEARCH_TOKEN is not set in the environment variables")
