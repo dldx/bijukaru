@@ -2,18 +2,6 @@ version = 1
 requires-python = ">=3.10"
 
 [[package]]
-name = "aiomcache"
-version = "0.8.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/8b/0a/914d8df1002d88ca70679d192f6e16d113e6b5cbcc13c51008db9230025f/aiomcache-0.8.2.tar.gz", hash = "sha256:43b220d7f499a32a71871c4f457116eb23460fa216e69c1d32b81e3209e51359", size = 10640 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a1/f8/78455f6377cbe85f335f4dbd40a807dafb72bd5fa05eb946f2ad0cec3d40/aiomcache-0.8.2-py3-none-any.whl", hash = "sha256:9d78d6b6e74e775df18b350b1cddfa96bd2f0a44d49ad27fa87759a3469cef5e", size = 10145 },
-]
-
-[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -93,7 +81,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "fastapi" },
-    { name = "fastapi-cache2", extra = ["memcache", "redis"] },
+    { name = "fastapi-cache2", extra = ["redis"] },
     { name = "httpx" },
     { name = "itsdangerous" },
     { name = "jinja2" },
@@ -107,7 +95,7 @@ dependencies = [
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.13.4" },
     { name = "fastapi", specifier = ">=0.115.12" },
-    { name = "fastapi-cache2", extras = ["memcache", "redis"], specifier = ">=0.2.2" },
+    { name = "fastapi-cache2", extras = ["redis"], specifier = ">=0.2.2" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "itsdangerous", specifier = ">=2.2.0" },
     { name = "jinja2", specifier = ">=3.1.6" },
@@ -334,9 +322,6 @@ wheels = [
 ]
 
 [package.optional-dependencies]
-memcache = [
-    { name = "aiomcache" },
-]
 redis = [
     { name = "redis" },
 ]
