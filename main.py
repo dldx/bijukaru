@@ -1,7 +1,8 @@
 import random
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 import httpx
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
@@ -46,6 +47,12 @@ if os.getenv("SEARCH_TOKEN") is None:
 # Set up templates
 templates = Jinja2Templates(directory="templates")
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Mount Svelte SPA static files
+app.mount("/_app", StaticFiles(directory="static/spa/_app"), name="spa-assets")
+
 media_sources = {
     "apod": {
         "media_source_name": "Astronomy Picture of the Day",
@@ -80,15 +87,10 @@ media_sources = {
 }
 
 
-@app.get("/{media_source}", response_class=HTMLResponse)
 @app.get("/", response_class=HTMLResponse)
-async def read_root(
-    request: Request,
-    media_source: Literal[
-        "thisiscolossal", "apod", "ukiyo-e", "guardian", "reddit", "wikiart"
-    ] = "thisiscolossal",
-):
-    return templates.TemplateResponse("index.html", {"request": request, "media_source": media_source, **media_sources[media_source]})
+async def serve_root(request: Request):
+    # Serve the Svelte SPA for the root route
+    return FileResponse("static/spa/index.html")
 
 
 @app.get("/api/thisiscolossal/categories", response_model=List[Category])
@@ -191,7 +193,14 @@ async def verify_token(token: str) -> JSONResponse:
     Uses constant time comparison to prevent timing attacks.
     """
     # Use constant time comparison to prevent timing attacks
-    is_correct = hmac.compare_digest(token, os.getenv("SEARCH_TOKEN"))
+    search_token = os.getenv("SEARCH_TOKEN")
+    if search_token is None:
+        return JSONResponse(
+            content={"authorized": False, "error": "Server configuration error"},
+            status_code=500,
+        )
+
+    is_correct = hmac.compare_digest(token, search_token)
 
     if is_correct:
         return JSONResponse(content={"authorized": True, "message": "Token accepted"})
@@ -210,7 +219,13 @@ async def search_gallery(query: str, token: Optional[str] = None) -> JSONRespons
     Requires a valid token for access.
     """
     # Verify token first
-    if not token or not hmac.compare_digest(token, os.getenv("SEARCH_TOKEN")):
+    search_token = os.getenv("SEARCH_TOKEN")
+    if search_token is None:
+        return JSONResponse(
+            content={"error": "Server configuration error"}, status_code=500
+        )
+
+    if not token or not hmac.compare_digest(token, search_token):
         return JSONResponse(
             content={"error": "Unauthorized. Valid token required for search."},
             status_code=401,
@@ -247,3 +262,25 @@ async def get_media_sources():
             }
         )
     return sources
+
+
+# This must be last to avoid capturing API routes
+@app.get("/{path:path}", response_class=HTMLResponse)
+async def serve_spa(request: Request, path: str):
+    # List of media sources that should be handled by the SPA
+    spa_media_sources = [
+        "apod",
+        "thisiscolossal",
+        "guardian",
+        "reddit",
+        "ukiyo-e",
+        "wikiart",
+    ]
+
+    # Check if the path is a media source route (e.g., /guardian, /wikiart)
+    # or any other non-API route that should be handled by the SPA
+    path_parts = path.strip("/").split("/")
+
+    # All non-API routes should be handled by the SPA
+    # This includes media source routes like /guardian, /thisiscolossal, etc.
+    return FileResponse("static/spa/index.html")
