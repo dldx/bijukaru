@@ -43,6 +43,7 @@ Visit [https://frames.dldx.org](https://frames.dldx.org) to see the gallery in a
 ### Keyboard Navigation
 
 - **Left/Right Arrow Keys**: Navigate between images
+- **Enter Key**: Open original image article in new tab
 - **Up/Down Arrow Keys**: Navigate between categories
 - **Page Up/Down Keys**: Navigate between media sources
 - **F Key**: Toggle fullscreen mode
@@ -51,7 +52,6 @@ Visit [https://frames.dldx.org](https://frames.dldx.org) to see the gallery in a
 - **/ Key**: Open search interface
 - **H Key**: Display help with all keyboard shortcuts
 - **Escape Key**: Exit fullscreen mode or close search overlay
-- **Enter Key**: Open original article in new tab
 
 ### Search Functionality
 
