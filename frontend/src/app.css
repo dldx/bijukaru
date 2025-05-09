@@ -2,9 +2,10 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Basic reset */
-*, *::before, *::after {
-  box-sizing: border-box;
+@theme {
+  --color-dark-surface: #1e1e1e;
+  --color-dark-text: #e0e0e0;
+  --color-dark-bg: #121212;
 }
 
 html, body {
@@ -23,45 +24,6 @@ body {
   transition: background-color 0.3s, color 0.3s;
 }
 
-/* Light theme (default) */
-body {
-  background-color: #f5f5f5;
-  color: #333;
-}
-
-/* Dark theme */
-:global(.dark) body {
-  background-color: #121212;
-  color: #e0e0e0;
-}
-
-/* Typography */
-h1, h2, h3, h4, h5, h6 {
-  margin-top: 0;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-p {
-  margin-top: 0;
-  margin-bottom: 1rem;
-}
-
-a {
-  color: #3498db;
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
-/* Basic button styling */
-button {
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 1rem;
-}
 
 /* Hide scrollbar but allow scrolling */
 .hide-scrollbar {

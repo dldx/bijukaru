@@ -15,12 +15,8 @@
         // Initialize gallery
         galleryState.init();
 
-        // Add global keyboard event listener
-        window.addEventListener('keydown', galleryState.handleKeyDown);
-
         // Cleanup function for timers and event listeners
         return () => {
-            window.removeEventListener('keydown', galleryState.handleKeyDown);
             if (galleryState.autoSlideIntervalId) clearInterval(galleryState.autoSlideIntervalId);
             if (galleryState.controlsTimeoutId) clearTimeout(galleryState.controlsTimeoutId);
             if (galleryState.inactivityTimeoutId) clearTimeout(galleryState.inactivityTimeoutId);
@@ -28,7 +24,6 @@
             if (galleryState.progressIntervalId) clearInterval(galleryState.progressIntervalId);
         };
     });
-    console.log(galleryState);
 
 </script>
 
@@ -111,21 +106,36 @@
     <!-- Search Overlay -->
     {#if galleryState.showSearchOverlay}
         <div class="search-overlay"
-             onclick={() => galleryState.closeSearchOverlay()}
-             onkeydown={(e) => e.key === 'Escape' && galleryState.closeSearchOverlay()}>
-            <div class="search-content">
+        onclick={() => galleryState.closeSearchOverlay()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="search-dialog-title"
+        tabindex="0"
+        onkeydown={(e) => e.key === 'Escape' && galleryState.closeSearchOverlay()}
+        >
+            <div class="search-content"
+            onclick={(e) => e.stopPropagation()}
+            onkeydown={(e) => e.key === 'Escape' && galleryState.closeSearchOverlay()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="search-dialog-title"
+            tabindex="0"
+            >
                 <button onclick={() => galleryState.closeSearchOverlay()} class="close-button" aria-label="Close search">×</button>
                 <h3 class="mb-4 font-semibold text-xl text-center">Search Gallery</h3>
 
                 <!-- Token input (shown when not authorized) -->
                 {#if !galleryState.isSearchAuthorized}
                     <div class="mb-4">
-                        <label class="block mb-2 text-sm">Enter token to access search:</label>
-                        <input type="password"
+                        <form onsubmit={() => galleryState.verifyToken()}>
+                        <label class="block mb-2 text-sm" for="searchToken">Enter token to access search:</label>
+                        <input type="text"
+                               id="searchToken"
                                bind:value={galleryState.searchToken}
                                onkeydown={(e) => e.key === 'Enter' && galleryState.verifyToken()}
                                placeholder="Enter token"
                                class="bg-white dark:bg-gray-200 px-4 py-2 rounded w-full text-gray-900">
+                        </form>
                         {#if galleryState.tokenError}
                             <div class="mt-2 text-red-400 text-sm">{galleryState.tokenError}</div>
                         {/if}
@@ -221,10 +231,15 @@
                     {/if}
 
                     <!-- Mobile navigation areas -->
-                    <div class="mobile-nav-area mobile-nav-prev"
-                        onclick={() => galleryState.prevItem()}></div>
-                    <div class="mobile-nav-area mobile-nav-next"
-                        onclick={() => galleryState.nextItem()}></div>
+                    <button class="mobile-nav-area mobile-nav-prev"
+                        onclick={() => galleryState.prevItem()}
+                        onkeydown={(e) => e.key === 'Enter' && galleryState.prevItem()}
+                        aria-label="Previous image"
+                        ></button>
+                    <button class="mobile-nav-area mobile-nav-next"
+                        onclick={() => galleryState.nextItem()}
+                        onkeydown={(e) => e.key === 'Enter' && galleryState.nextItem()}
+                        aria-label="Next image"></button>
 
                     <!-- Category navigation - Up arrow -->
                     <div class="flex items-center category-nav-button category-up nav-button"
@@ -371,7 +386,7 @@
                             onchange={() => galleryState.loadCategory()}
                             class="bg-white dark:bg-dark-surface px-4 py-2 border-gray-300 border-unset dark:border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-full md:max-w-[30vw] xl:max-w-none text-gray-800 dark:text-dark-text">
                             {#each galleryState.categories as category (category.id)}
-                                <option value={category.id}>{category.name}</option>
+                                <option value={category.id} selected={category.id === (galleryState.selectedCategory || galleryState.categories[0].id)}>{category.name}</option>
                             {/each}
                         </select>
                     </div>
