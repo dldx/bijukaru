@@ -168,6 +168,9 @@ async def _get_wikiart_feed(
 ):
     if category == "random-artist":
         _category = "artist:" + random.choice(get_popular_artists())
+        return RedirectResponse(
+            f"{app.url_path_for('_get_wikiart_feed')}/?category={_category}&hd={hd}"
+        )
     else:
         _category = category
     # Send cache control headers
