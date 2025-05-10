@@ -227,7 +227,10 @@
                         class:visible={galleryState.showMediaSourceOverlay}
                         class:opacity-0={!galleryState.showMediaSourceOverlay}
                         class:hidden={galleryState.isMobile}>
-                        {@html galleryState.mediaSourceOverlayText}
+                        <div class="mb-1 font-bold text-2xl">{galleryState.currentSourceName}</div>
+                        <div class="opacity-75 text-sm">{galleryState.currentCategoryName}</div>
+
+
                     </div>
 
                     <!-- Current image -->

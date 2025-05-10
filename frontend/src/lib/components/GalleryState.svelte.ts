@@ -74,7 +74,8 @@ interface GalleryState {
     progressIntervalId: any;
     category?: Category;
     currentItem?: ImageItem | null;
-
+    currentSourceName: string;
+    currentCategoryName: string;
     // Add method signatures
     updateDocumentTitle: () => void;
     updateURL: () => void;
@@ -171,6 +172,14 @@ export class GalleryStateClass implements GalleryState {
     // Computed property for current item
     get currentItem() {
         return this.items[this.currentIndex] || null;
+    }
+
+    get currentCategoryName() {
+        return this.category ? this.category.name : this.getCurrentCategoryName();
+    }
+
+    get currentSourceName() {
+        return this.mediaSources.find(s => s.id === this.selectedMediaSource)?.name || 'Unknown Source';
     }
 
     // Initialize gallery
@@ -938,8 +947,7 @@ export class GalleryStateClass implements GalleryState {
         const sourceName = this.mediaSources.find(source => source.id === this.selectedMediaSource)?.name;
         const categoryName = this.getCurrentCategoryName();
         this.mediaSourceOverlayText = `
-                        <div class="mb-1 font-bold text-2xl">${sourceName}</div>
-                        <div class="opacity-75 text-sm">${categoryName}</div>
+
                     `;
 
         // First transition to visible state
