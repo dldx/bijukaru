@@ -1,13 +1,10 @@
 import random
+from urllib.parse import parse_qs, urlencode
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-import httpx
-import xml.etree.ElementTree as ET
-from bs4 import BeautifulSoup
 from typing import List, Literal, Optional
-from datetime import datetime
 import hmac
 import os
 from fastapi_cache import FastAPICache
@@ -265,22 +262,17 @@ async def get_media_sources():
 
 
 # This must be last to avoid capturing API routes
-@app.get("/{path:path}", response_class=HTMLResponse)
-async def serve_spa(request: Request, path: str):
-    # List of media sources that should be handled by the SPA
-    spa_media_sources = [
-        "apod",
-        "thisiscolossal",
-        "guardian",
-        "reddit",
-        "ukiyo-e",
-        "wikiart",
-    ]
-
-    # Check if the path is a media source route (e.g., /guardian, /wikiart)
-    # or any other non-API route that should be handled by the SPA
-    path_parts = path.strip("/").split("/")
-
+@app.get("/{path}", response_class=HTMLResponse)
+async def serve_spa(
+    request: Request,
+    path: Literal["apod", "thisiscolossal", "guardian", "reddit", "ukiyo-e", "wikiart"],
+):
     # All non-API routes should be handled by the SPA
     # This includes media source routes like /guardian, /thisiscolossal, etc.
-    return FileResponse("static/spa/index.html")
+    query_params = request.query_params.items()
+    # Remove the source parameter
+    query_params = [param for param in query_params if param[0] != "media_source"]
+    # Redirect to the new URL with the source parameter
+    return RedirectResponse(
+        f"/?media_source={path}&{urlencode(query_params)}", status_code=302
+    )

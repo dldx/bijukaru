@@ -30,7 +30,13 @@
 <div class="bg-gray-100 dark:bg-dark-bg text-gray-900 dark:text-dark-text transition-colors duration-300 main-container">
     <!-- Help Overlay -->
     {#if galleryState.showHelp}
-        <div class="help-overlay" onclick={(e) => { e.stopPropagation(); galleryState.showHelp = false }}>
+        <div class="help-overlay" onclick={(e) => { e.stopPropagation(); galleryState.showHelp = false }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="help-dialog-title"
+            tabindex="0"
+            onkeydown={(e) => {e.key === 'h'; galleryState.showHelp = false}}
+            >
             <div class="help-content">
                 <h2 class="mb-4 font-bold text-2xl text-center">Keyboard Shortcuts</h2>
                 <table class="shortcuts-table">
@@ -105,7 +111,7 @@
 
     <!-- Search Overlay -->
     {#if galleryState.showSearchOverlay}
-        <div class="search-overlay"
+        <div class="z-[100] fixed inset-0 flex justify-center items-center bg-black/85 backdrop-blur-sm p-4"
         onclick={() => galleryState.closeSearchOverlay()}
         role="dialog"
         aria-modal="true"
@@ -113,7 +119,7 @@
         tabindex="0"
         onkeydown={(e) => e.key === 'Escape' && galleryState.closeSearchOverlay()}
         >
-            <div class="search-content"
+            <div class="relative bg-gray-900 dark:bg-dark-surface shadow-xl p-6 rounded-lg w-full max-w-md"
             onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => e.key === 'Escape' && galleryState.closeSearchOverlay()}
             role="dialog"
@@ -121,43 +127,48 @@
             aria-labelledby="search-dialog-title"
             tabindex="0"
             >
-                <button onclick={() => galleryState.closeSearchOverlay()} class="close-button" aria-label="Close search">×</button>
-                <h3 class="mb-4 font-semibold text-xl text-center">Search Gallery</h3>
+                <button onclick={() => galleryState.closeSearchOverlay()} class="top-4 right-4 absolute text-gray-400 hover:text-white text-xl transition-colors cursor-pointer" aria-label="Close search">×</button>
 
                 <!-- Token input (shown when not authorized) -->
                 {#if !galleryState.isSearchAuthorized}
                     <div class="mb-4">
                         <form onsubmit={() => galleryState.verifyToken()}>
-                        <label class="block mb-2 text-sm" for="searchToken">Enter token to access search:</label>
+                        <label class="block mb-2 text-gray-300 text-sm" for="searchToken">Enter token to access search:</label>
                         <input type="text"
                                id="searchToken"
                                bind:value={galleryState.searchToken}
                                onkeydown={(e) => e.key === 'Enter' && galleryState.verifyToken()}
                                placeholder="Enter token"
-                               class="bg-white dark:bg-gray-200 px-4 py-2 rounded w-full text-gray-900">
+                               autofocus
+                               class="bg-white/90 dark:bg-gray-200/90 px-4 py-2 border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900">
                         </form>
                         {#if galleryState.tokenError}
                             <div class="mt-2 text-red-400 text-sm">{galleryState.tokenError}</div>
                         {/if}
 
-                        <div class="flex justify-center mt-4">
+                        <div class="flex justify-center mt-5">
                             <button onclick={() => galleryState.verifyToken()}
-                                    class="search-button">
+                                    class="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-md text-white transition-colors cursor-pointer">
                                 <span class:hidden={galleryState.loading}>Verify</span>
                                 <span class:hidden={!galleryState.loading}>Verifying...</span>
                             </button>
                         </div>
                     </div>
                 {:else}
+                    <div class="flex flex-row justify-center gap-4 mt-5">
                     <input type="text"
                            bind:value={galleryState.searchQuery}
                            onkeydown={(e) => e.key === 'Enter' && galleryState.performSearch()}
                            placeholder="e.g., Van Gogh starry night, APOD today, Reddit cats..."
-                           class="bg-white dark:bg-gray-200 px-4 py-2 rounded w-full text-gray-900">
+                           autofocus
+                           class="bg-white/90 dark:bg-gray-200/90 px-4 py-2 border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900">
 
-                    <div class="flex justify-center mt-4">
-                        <button onclick={() => galleryState.performSearch()} class="search-button">
-                            <span class:hidden={galleryState.loading}>Search</span>
+                        <button onclick={() => galleryState.performSearch()}
+                                class="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-md text-white transition-colors cursor-pointer"
+                                title="Search"
+                                aria-label="Search gallery"
+                                >
+                            <span class:hidden={galleryState.loading}>✨</span>
                             <span class:hidden={!galleryState.loading}>Searching...</span>
                         </button>
                     </div>
@@ -174,7 +185,7 @@
     {#if galleryState.showMessageOverlay}
         <div class="z-[110] fixed inset-0 flex justify-center items-center"
              transition:fade={{duration: 300}}>
-            <div class="bg-black bg-opacity-80 shadow-lg px-8 py-6 rounded-xl max-w-md text-white text-center">
+            <div class="bg-black/80 shadow-lg px-8 py-6 rounded-xl max-w-md text-white text-center">
                 <div class="text-lg">{galleryState.overlayMessage}</div>
             </div>
         </div>
@@ -184,11 +195,11 @@
     {#if galleryState.items.length > 0}
         <div class="gallery-wrapper">
             <!-- Exit fullscreen button for mobile -->
-            <button
-                class:hidden={!galleryState.hideToolbar}
-                onclick={() => galleryState.exitFullscreen()}
-                class="exit-fullscreen-btn nav-button"
-                aria-label="Exit fullscreen">
+            {#if galleryState.hideToolbar || galleryState.isFullscreen}
+                <button
+                    onclick={() => galleryState.exitFullscreen()}
+                    class="cursor-pointer exit-fullscreen-btn nav-button"
+                    aria-label="Exit fullscreen">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
                     class:hidden={!galleryState.isFullscreen && !galleryState.hideToolbar}
                     fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -196,12 +207,13 @@
                         stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
+            {/if}
 
             <!-- Image container -->
             <div class="image-container">
                 <!-- Loading state -->
                 <div class:hidden={!galleryState.loading}
-                    class="z-10 absolute flex justify-center items-center bg-black bg-opacity-50 w-full h-full transition-all duration-300">
+                    class="z-10 absolute flex justify-center items-center bg-black/50 w-full h-full transition-all duration-300">
                     <div
                         class="border-gray-700 dark:border-gray-300 border-b-2 rounded-full w-12 h-12 animate-spin">
                     </div>
@@ -211,7 +223,7 @@
                     <!-- Media source overlay -->
                     <div
                         transition:fade={{duration: 300}}
-                        class="top-1/2 left-1/2 z-9 fixed flex flex-col justify-center items-center bg-black bg-opacity-50 shadow-lg px-8 py-4 rounded-xl font-semibold text-white text-center transition-opacity -translate-x-1/2 -translate-y-1/2 duration-300 nav-button transform"
+                        class="top-1/2 left-1/2 z-9 fixed flex flex-col justify-center items-center bg-black/50 shadow-lg px-8 py-4 rounded-xl font-semibold text-white text-center transition-opacity -translate-x-1/2 -translate-y-1/2 duration-300 nav-button transform"
                         class:visible={galleryState.showMediaSourceOverlay}
                         class:opacity-0={!galleryState.showMediaSourceOverlay}
                         class:hidden={galleryState.isMobile}>
@@ -246,7 +258,7 @@
                          class:hidden={galleryState.categories.length <= 1}>
                         <button
                             onclick={() => galleryState.prevCategory()}
-                            class="flex items-center bg-black bg-opacity-50 hover:bg-opacity-80 px-4 py-2 rounded-full text-white transition-all duration-300"
+                            class="flex items-center bg-black/50 hover:bg-black/80 px-4 py-2 rounded-full text-white transition-all duration-300 cursor-pointer"
                             aria-label="Previous category">
                             <svg xmlns="http://www.w3.org/2000/svg"
                                 class="w-5 h-5"
@@ -265,7 +277,7 @@
                          class:hidden={galleryState.categories.length <= 1}>
                         <button
                             onclick={() => galleryState.nextCategory()}
-                            class="flex items-center bg-black bg-opacity-50 hover:bg-opacity-80 px-4 py-2 rounded-l-full text-white transition-all duration-300"
+                            class="flex items-center bg-black/50 hover:bg-black/80 px-4 py-2 rounded-l-full text-white transition-all duration-300 cursor-pointer"
                             class:rounded-r-full={galleryState.selectedCategory !== 'random-artist'}
                             aria-label="Next category">
                             <svg xmlns="http://www.w3.org/2000/svg"
@@ -282,7 +294,7 @@
                         <!-- Refresh button for Random Artist category -->
                         <button
                             onclick={() => galleryState.refreshRandomArtist()}
-                            class="bg-black bg-opacity-50 hover:bg-opacity-80 px-3 py-[10px] border-white-600 border-l rounded-r-full text-white transition-all duration-300"
+                            class="bg-black/50 hover:bg-black/80 px-3 py-[10px] border-white-600 border-l rounded-r-full text-white transition-all duration-300 cursor-pointer"
                             class:hidden={galleryState.selectedCategory !== 'random-artist'}
                             title="Refresh random artist"
                             aria-label="Refresh random artist">
@@ -300,7 +312,7 @@
                     <!-- Previous image button -->
                     <button
                         onclick={() => galleryState.prevItem()}
-                        class="bg-black bg-opacity-50 hover:bg-opacity-80 p-2 rounded-full text-white transition-all duration-300 image-nav-button image-nav-prev nav-button"
+                        class="bg-black/50 hover:bg-black/80 p-2 rounded-full text-white transition-all duration-300 cursor-pointer image-nav-button image-nav-prev nav-button"
                         aria-label="Previous image">
                         <svg xmlns="http://www.w3.org/2000/svg"
                             class="w-6 h-6"
@@ -315,7 +327,7 @@
                     <!-- Next image button -->
                     <button
                         onclick={() => galleryState.nextItem()}
-                        class="bg-black bg-opacity-50 hover:bg-opacity-80 p-2 rounded-full text-white transition-all duration-300 image-nav-button image-nav-next nav-button"
+                        class="bg-black/50 hover:bg-black/80 p-2 rounded-full text-white transition-all duration-300 cursor-pointer image-nav-button image-nav-next nav-button"
                         aria-label="Next image">
                         <svg xmlns="http://www.w3.org/2000/svg"
                             class="w-6 h-6"
@@ -340,8 +352,8 @@
                         {/if}
                         <div class:hidden={!galleryState.selectedCategory}
                             class:mobile-truncate={galleryState.selectedMediaSource !== 'wikiart'}
-                            class="bg-black bg-opacity-50 ml-3 px-3 py-1 rounded-full text-sm">
-                            <span>{galleryState.getCurrentCategoryName()}</span>
+                        class="bg-black/50 ml-3 px-3 py-1 rounded-full text-sm">
+                        <span>{galleryState.getCurrentCategoryName()}</span>
                         </div>
                     </div>
 
@@ -363,8 +375,8 @@
 
             <!-- Pagination and controls -->
             <div
-                class="flex justify-center items-center text-sm control-bar"
-                class:hidden={galleryState.hideToolbar}>
+                class="{galleryState.hideToolbar ? 'hidden' : 'flex'} justify-center items-center text-sm control-bar"
+                >
 
                 <!-- Clustered selectors-->
                 <div class="flex flex-shrink items-center space-x-1 md:space-x-2">
@@ -405,7 +417,7 @@
                             title="Search ( / )"
                             aria-label="Search gallery"
                             class:hidden={!galleryState.isSearchAuthorized}
-                            class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none text-gray-600 dark:text-gray-400">
+                            class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none text-gray-600 dark:text-gray-400 cursor-pointer">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
                         </svg>
@@ -416,7 +428,7 @@
                         onclick={() => galleryState.togglePause()}
                         aria-label="Toggle slideshow"
                         title="Pause/Resume slideshow"
-                        class="hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full focus:outline-none"
+                        class="hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full focus:outline-none cursor-pointer"
                         class:text-blue-500={galleryState.isPaused}
                         class:text-gray-600={!galleryState.isPaused}
                         class:dark:text-gray-400={!galleryState.isPaused}>
@@ -446,8 +458,7 @@
                         onclick={() => galleryState.toggleHD()}
                         aria-label="Toggle HD quality"
                         title="Toggle HD images"
-                        class:hidden={!galleryState.hdSupported}
-                        class="hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full focus:outline-none"
+                        class="hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full focus:outline-none cursor-pointer"
                         class:text-blue-500={galleryState.isHD}
                         class:text-gray-600={!galleryState.isHD}
                         class:dark:text-gray-400={!galleryState.isHD}>
@@ -462,7 +473,7 @@
                         onclick={() => galleryState.toggleFullscreen()}
                         aria-label="Toggle fullscreen"
                         title="Toggle fullscreen"
-                        class="hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full focus:outline-none text-gray-600 dark:text-gray-400">
+                        class="hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full focus:outline-none text-gray-600 dark:text-gray-400 cursor-pointer">
                         <svg xmlns="http://www.w3.org/2000/svg"
                             class="w-5 h-5"
                             fill="none" viewBox="0 0 24 24"
@@ -479,7 +490,7 @@
                         onclick={() => galleryState.showDescription = !galleryState.showDescription}
                         aria-label="Toggle description"
                         title="Toggle description"
-                        class="hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full focus:outline-none"
+                        class="hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full focus:outline-none cursor-pointer"
                         class:text-blue-500={galleryState.showDescription}
                         class:text-gray-600={!galleryState.showDescription}
                         class:dark:text-gray-400={!galleryState.showDescription}>
@@ -625,58 +636,6 @@
     min-width: 1.5rem;
 }
 /* Search overlay */
-.search-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.85);
-    color: white;
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-    justify-content: center; /* Center vertically */
-    align-items: center;
-    padding: 2rem;
-}
-.search-content {
-    background-color: #1e1e1e; /* Dark surface */
-    padding: 2rem;
-    border-radius: 8px;
-    max-width: 500px; /* Limit width */
-    width: 100%;
-    position: relative; /* For close button */
-}
-.search-overlay input[type="text"],
-.search-overlay input[type="password"] {
-    color: #121212; /* Dark text for input */
-    width: 100%;
-    padding: 0.75rem 1rem;
-    border-radius: 4px;
-    border: 1px solid #555;
-    margin-bottom: 1rem;
-}
-.search-overlay button {
-    padding: 0.75rem 1.5rem;
-    border-radius: 4px;
-    cursor: pointer;
-}
-.search-overlay .search-button {
-    background-color: #3b82f6; /* Blue */
-    color: white;
-    border: none;
-}
-.search-overlay .close-button {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    background: none;
-    border: none;
-    color: #aaa;
-    font-size: 1.5rem;
-    cursor: pointer;
-}
 /* Exit fullscreen button for mobile */
 .exit-fullscreen-btn {
     position: absolute;
@@ -886,10 +845,9 @@ input:checked + .toggle-slider:before {
 /* Control bar at bottom */
 .control-bar {
     font-family: 'Domine', serif;
-    padding: 0.75rem;
+    padding: 0.25rem;
     flex-shrink: 0;
     border-top: 1px solid rgba(0,0,0,0.1);
-    display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
     justify-content: space-between;

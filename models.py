@@ -78,8 +78,6 @@ class BijukaruUrlParams(BaseModel):
     @property
     def url(self) -> str:
         params = self.model_dump(exclude_none=True)
-        # Remove media_source since it's in the path
-        params.pop("media_source", None)
         # Remove the llm_thinking since it's not a valid URL param
         params.pop("llm_thinking", None)
         # Convert to URL params
@@ -90,7 +88,7 @@ class BijukaruUrlParams(BaseModel):
                 value = str(value).lower()
             param_strings.append(f"{key}={value}")
         query_string = "&".join(param_strings)
-        return f"/{self.media_source}{'?' + query_string if query_string else ''}"
+        return f"/{'?' + query_string if query_string else ''}"
 
 
 # Mapping from media_source literal to its category function

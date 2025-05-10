@@ -197,7 +197,11 @@ def get_wikiart_feed(category: str, hd: bool = False) -> Feed:
             FeedItem(
                 id=str(artwork.contentId),
                 title=(
-                    f"{artwork.title} ({artwork.yearAsString}) | {artwork.artistName}"
+                    (
+                        f"{artwork.title} ({artwork.yearAsString}) | {artwork.artistName}"
+                        if artwork.yearAsString
+                        else f"{artwork.title} | {artwork.artistName}"
+                    )
                     if category in ["most-viewed", "random-artist"]
                     or category.startswith("style:")
                     else (
@@ -298,7 +302,7 @@ def search_wikiart(query: str) -> Feed:
                 title=(
                     f"{artwork.title} ({artwork.yearAsString}) | {artwork.artistName}"
                     if artwork.yearAsString
-                    else artwork.title
+                    else f"{artwork.title} | {artwork.artistName}"
                 ),
                 description="",
                 image_url=artwork.image_url,
