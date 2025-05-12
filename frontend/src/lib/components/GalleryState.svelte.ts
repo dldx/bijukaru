@@ -8,6 +8,9 @@ interface ImageItem {
     image_url: string;
     link: string;
     description?: string;
+    sourceCategory?: string;
+    artist_name?: string;
+    media_source?: string;
 }
 
 interface MediaSource {
@@ -76,6 +79,10 @@ interface GalleryState {
     currentItem?: ImageItem | null;
     currentSourceName: string;
     currentCategoryName: string;
+    favorites: Map<string, Set<string>>;
+    showFavorites: boolean;
+    likedImages: ImageItem[];
+    showLikedImages: boolean;
     // Add method signatures
     updateDocumentTitle: () => void;
     updateURL: () => void;
@@ -115,6 +122,19 @@ interface GalleryState {
     changeMediaSource: () => void;
     showTemporaryMediaSourceOverlay: () => void;
     shuffleArray: (array: any[]) => any[];
+    toggleFavorite: (categoryId?: string) => void;
+    isFavorite: (categoryId?: string) => boolean;
+    loadFavorites: () => void;
+    saveFavorites: () => void;
+    loadFavoritesCategory: () => Promise<void>;
+    toggleShowFavorites: () => void;
+    loadAllFavorites: () => Promise<void>;
+    toggleLikeImage: () => void;
+    isImageLiked: () => boolean;
+    loadLikedImages: () => void;
+    saveLikedImages: () => void;
+    loadLikedImagesView: () => Promise<void>;
+    toggleShowLikedImages: () => void;
 }
 
 export class GalleryStateClass implements GalleryState {
@@ -168,6 +188,10 @@ export class GalleryStateClass implements GalleryState {
     controlsTimeoutId = $state<number | null>(null);
     progressIntervalId = $state<number | null>(null);
     category = $state<Category | undefined>(undefined);
+    favorites = $state<Map<string, Set<string>>>(new Map());
+    showFavorites = $state(false);
+    likedImages = $state<ImageItem[]>([]);
+    showLikedImages = $state(false);
 
     // Computed property for current item
     get currentItem() {
@@ -186,6 +210,9 @@ export class GalleryStateClass implements GalleryState {
     init = async () => {
         // Apply dark mode on page load
         this.applyTheme();
+
+        // Load favorites from localStorage
+        this.loadFavorites();
 
         // Track mouse position
         this.mouseX = 0;
@@ -226,6 +253,11 @@ export class GalleryStateClass implements GalleryState {
         // Fetch categories first
         await this.loadCategories();
 
+        // Check for favorites view parameter
+        const favoritesParam = urlParams.get('favorites');
+        if (favoritesParam === 'true') {
+            this.showFavorites = true;
+        }
 
         // Check for category parameter
         const categoryParam = urlParams.get('category');
@@ -401,6 +433,15 @@ export class GalleryStateClass implements GalleryState {
                 this.verifyToken(false); // Verify silently
             }
         }
+
+        // Load liked images from localStorage
+        this.loadLikedImages();
+
+        // Check for liked images view parameter
+        const likedParam = urlParams.get('liked');
+        if (likedParam === 'true') {
+            this.showLikedImages = true;
+        }
     }
     handleImageError = (event: Event) => {
 
@@ -409,86 +450,102 @@ export class GalleryStateClass implements GalleryState {
 
     // Update document title with current image
     updateDocumentTitle = () => {
-        const sourceInfo = this.mediaSources.find(s => s.id === this.selectedMediaSource);
-        const sourceName = sourceInfo ? sourceInfo.name : 'Unknown Source';
+        let title = 'Bijukaru picture carousel';
 
-        if (this.items[this.currentIndex]) {
-            document.title = `${this.items[this.currentIndex].title} - ${this.getCurrentCategoryName()} - ${sourceName} - Bijukaru picture carousel`;
-        } else {
-            document.title = "Bijukaru - Picture carousel";
+        // Get media source name
+        const sourceInfo = this.mediaSources.find(s => s.id === this.selectedMediaSource);
+        if (sourceInfo) {
+            title = `${sourceInfo.name} - ${title}`;
         }
+
+        // Add favorites or liked images indicator
+        if (this.showFavorites) {
+            title = `⭐ Favorites - ${title}`;
+        } else if (this.showLikedImages) {
+            title = `❤️ Liked Images - ${title}`;
+        }
+        // Add current image title
+        else if (this.currentItem) {
+            title = `${this.currentItem.title} - ${title}`;
+        }
+
+        document.title = title;
     }
 
     // Update URL with current parameters
     updateURL = () => {
-        const currentItem = this.items[this.currentIndex];
-        const url = new URL(window.location.href);
+        try {
+            // Update the URL with current state
+            const url = new URL(window.location.href);
 
-        // Set current image ID if available
-        if (currentItem && currentItem.id) {
-            url.searchParams.set('image_id', currentItem.id);
-        } else {
-            url.searchParams.delete('image_id');
-        }
-
-        // set media source
-        if (this.selectedMediaSource) {
+            // Set media source
             url.searchParams.set('media_source', this.selectedMediaSource);
-        } else {
-            url.searchParams.delete('media_source');
-        }
 
-        // Set category if selected
-        if (this.selectedCategory) {
-            url.searchParams.set('category', this.selectedCategory);
-        } else {
-            url.searchParams.delete('category');
-        }
+            // Set category unless we're in favorites view
+            if (!this.showFavorites && this.selectedCategory) {
+                url.searchParams.set('category', this.selectedCategory);
+            } else {
+                url.searchParams.delete('category');
+            }
 
-        // Preserve interval parameter if it's not default
-        if (this.slideInterval !== 10000) {
-            url.searchParams.set('interval', String(this.originalInterval / 1000 || this.slideInterval / 1000));
-        } else if (url.searchParams.has('interval')) {
-            url.searchParams.delete('interval');
-        }
+            // Set image ID
+            if (this.currentItem?.id) {
+                url.searchParams.set('image_id', this.currentItem.id);
+            } else {
+                url.searchParams.delete('image_id');
+            }
 
-        // Add paused parameter if paused
-        if (this.isPaused) {
-            url.searchParams.set('paused', 'true');
-        } else if (url.searchParams.has('paused')) {
-            url.searchParams.delete('paused');
-        }
+            // Set interval if different from default
+            if (this.slideInterval !== 10000) {
+                url.searchParams.set('interval', String(this.slideInterval / 1000));
+            } else {
+                url.searchParams.delete('interval');
+            }
 
-        // Add HD parameter if enabled
-        if (this.isHD) {
-            url.searchParams.set('hd', 'true');
-        } else if (url.searchParams.has('hd')) {
-            url.searchParams.delete('hd');
-        }
+            // Set HD parameter if enabled
+            if (this.isHD) {
+                url.searchParams.set('hd', 'true');
+            } else {
+                url.searchParams.delete('hd');
+            }
 
-        // Preserve prefetch parameter if it's not default
-        if (this.nToPrefetch !== 2) {
-            url.searchParams.set('prefetch', String(this.nToPrefetch));
-        } else if (url.searchParams.has('prefetch')) {
-            url.searchParams.delete('prefetch');
-        }
+            // Set fullscreen parameter if enabled
+            if (this.hideToolbar) {
+                url.searchParams.set('fullscreen', 'true');
+            } else {
+                url.searchParams.delete('fullscreen');
+            }
 
-        // Preserve fullscreen parameter if toolbar is hidden
-        if (this.hideToolbar) {
-            url.searchParams.set('fullscreen', 'true');
-        } else if (url.searchParams.has('fullscreen')) {
-            url.searchParams.delete('fullscreen');
-        }
+            // Set description visibility
+            if (this.showDescription) {
+                url.searchParams.set('showDescription', 'true');
+            } else {
+                url.searchParams.delete('showDescription');
+            }
 
-        // Preserve showDescription parameter
-        if (this.showDescription) {
-            url.searchParams.set('showDescription', 'true');
-        } else if (url.searchParams.has('showDescription')) {
-            url.searchParams.delete('showDescription');
-        }
+            // Set favorites view parameter
+            if (this.showFavorites) {
+                url.searchParams.set('favorites', 'true');
+            } else {
+                url.searchParams.delete('favorites');
+            }
 
-        // Update URL without reloading the page
-        pushState(url.toString(), {});
+            // Set liked images view parameter
+            if (this.showLikedImages) {
+                url.searchParams.set('liked', 'true');
+            } else {
+                url.searchParams.delete('liked');
+            }
+
+            // Update the browser URL without refreshing
+            pushState(url.toString(), {
+                mediaSource: this.selectedMediaSource,
+                category: this.selectedCategory,
+                imageId: this.currentItem?.id
+            });
+        } catch (e) {
+            console.error('Error updating URL:', e);
+        }
     }
 
     // Get previous category name for navigation
@@ -507,6 +564,11 @@ export class GalleryStateClass implements GalleryState {
 
     // Get current category name
     getCurrentCategoryName = () => {
+        // If we're viewing favorites and have a current item with sourceCategory, use that
+        if (this.showFavorites && this.currentItem?.sourceCategory) {
+            return this.currentItem.sourceCategory;
+        }
+
         // Check if we have a direct category reference
         if (this.category) {
             return this.category.name;
@@ -848,8 +910,16 @@ export class GalleryStateClass implements GalleryState {
 
     // Load category content
     loadCategory = async () => {
-        this.loading = true;
+        // Clear error
         this.error = null;
+
+        // Check if we should load favorites instead
+        if (this.showFavorites) {
+            return this.loadFavoritesCategory();
+        }
+
+        // Show loading state
+        this.loading = true;
 
         // Stop auto slide
         this.stopAutoSlide();
@@ -973,67 +1043,82 @@ export class GalleryStateClass implements GalleryState {
 
     // Handle keyboard shortcuts
     handleKeyDown = (e: KeyboardEvent) => {
-        // Skip if modifiers are used
-        if (e.metaKey || e.ctrlKey || e.altKey) {
-            return;
-        }
-
-        // Skip if typing in an input/textarea/select
-        if (document.activeElement &&
-            (document.activeElement.tagName === 'INPUT' ||
-                document.activeElement.tagName === 'TEXTAREA' ||
-                document.activeElement.tagName === 'SELECT')) {
-            return;
-        }
-
-        if (e.key === 'ArrowRight') {
-            this.nextItem();
-        } else if (e.key === 'ArrowLeft') {
-            this.prevItem();
-        } else if (e.key === 'ArrowUp') {
-            this.prevCategory();
-        } else if (e.key === 'ArrowDown') {
-            this.nextCategory();
-        } else if (e.key === 'd' || e.key === 'D') {
-            // Toggle description overlay
-            this.showDescription = !this.showDescription;
-            console.log('Description visibility toggled:', this.showDescription);
-
-            // Update URL when description is toggled
-            const url = new URL(window.location.href);
-            if (this.showDescription) {
-                url.searchParams.set('showDescription', 'true');
-            } else {
-                url.searchParams.delete('showDescription');
+        // Don't process key events if search is active or if an input element is focused
+        if (this.showSearchOverlay || (document.activeElement && ['input', 'textarea', 'select'].includes(document.activeElement.tagName.toLowerCase()))) {
+            // Still process Escape to close search overlay
+            if (e.key === 'Escape' && this.showSearchOverlay) {
+                this.closeSearchOverlay();
             }
-            pushState(url, {})
-        } else if (e.key === 'p' || e.key === 'P') {
-            this.togglePause();
-            e.preventDefault();
-        } else if (e.key === 'f' || e.key === 'F') {
-            this.toggleFullscreen();
-        } else if (e.key === 'Escape' && this.isFullscreen) {
-            this.exitFullscreen();
-        } else if (['h', 'H', '?'].includes(e.key)) {
-            this.showHelp = !this.showHelp;
-        } else if (['/'].includes(e.key) && this.isSearchAuthorized && !e.metaKey && !e.ctrlKey) {
-            this.openSearchOverlay();
-            e.preventDefault();
-        } else if (e.key === 'Enter' && this.currentItem?.link) {
-            // Open the current image's link in a new tab
-            window.open(this.currentItem.link, '_blank');
-        } else if (e.key === 'PageUp') {
-            // Navigate to previous media source
-            this.prevMediaSource();
-        } else if (e.key === 'PageDown') {
-            // Navigate to next media source
-            this.nextMediaSource();
-        } else if (e.key === 'r' && this.selectedCategory === 'random-artist') {
-            this.refreshRandomArtist();
+            return;
         }
 
-        // Any key press resets inactivity timer
-        this.resetInactivityTimer();
+        switch (e.key) {
+            case 'ArrowRight':
+                this.nextItem();
+                break;
+            case 'ArrowLeft':
+                this.prevItem();
+                break;
+            case 'Enter':
+                if (this.currentItem && this.currentItem.link) {
+                    window.open(this.currentItem.link, '_blank');
+                }
+                break;
+            case 'ArrowUp':
+                this.prevCategory();
+                break;
+            case 'ArrowDown':
+                this.nextCategory();
+                break;
+            case 'PageUp':
+                this.prevMediaSource();
+                break;
+            case 'PageDown':
+                this.nextMediaSource();
+                break;
+            case 'h':
+            case 'H':
+                this.showHelp = !this.showHelp;
+                break;
+            case 'p':
+            case 'P':
+                this.togglePause();
+                break;
+            case 'f':
+            case 'F':
+                this.toggleFullscreen();
+                break;
+            case 'd':
+            case 'D':
+                this.showDescription = !this.showDescription;
+                break;
+            case 'Escape':
+                this.exitFullscreen();
+                break;
+            case '/':
+                if (this.isSearchAuthorized) {
+                    this.openSearchOverlay();
+                }
+                break;
+            case 's':
+            case 'S':
+                this.toggleFavorite();
+                break;
+            case 'v':
+            case 'V':
+                this.toggleShowFavorites();
+                break;
+            case 'l':
+            case 'L':
+                this.toggleLikeImage();
+                break;
+            case 'i':
+            case 'I':
+                this.toggleShowLikedImages();
+                break;
+            default:
+                break;
+        }
     }
 
     // Navigate to previous category
@@ -1407,7 +1492,6 @@ export class GalleryStateClass implements GalleryState {
 
     }
     toggleHD = () => {
-
         // Store current image ID before toggling
         const currentImageId = this.currentItem?.id;
 
@@ -1429,7 +1513,354 @@ export class GalleryStateClass implements GalleryState {
 
         // Update URL
         this.updateURL();
+    }
 
+    // Favorites methods
+    loadFavorites = () => {
+        try {
+            const favoritesData = localStorage.getItem('galleryFavorites');
+            if (favoritesData) {
+                // Convert the serialized data back to a Map<string, Set<string>>
+                const parsed = JSON.parse(favoritesData);
+                const favoritesMap = new Map();
+
+                Object.keys(parsed).forEach(mediaSource => {
+                    favoritesMap.set(mediaSource, new Set(parsed[mediaSource]));
+                });
+
+                this.favorites = favoritesMap;
+            }
+        } catch (error) {
+            console.error('Error loading favorites:', error);
+        }
+    }
+
+    saveFavorites = () => {
+        try {
+            // Convert Map<string, Set<string>> to a serializable object
+            const serializedFavorites: Record<string, string[]> = {};
+
+            this.favorites.forEach((categories, mediaSource) => {
+                serializedFavorites[mediaSource] = Array.from(categories);
+            });
+
+            localStorage.setItem('galleryFavorites', JSON.stringify(serializedFavorites));
+        } catch (error) {
+            console.error('Error saving favorites:', error);
+        }
+    }
+
+    toggleFavorite = (categoryId?: string) => {
+        const category = categoryId || this.selectedCategory;
+        const mediaSource = this.selectedMediaSource;
+
+        if (!category || !mediaSource) return;
+
+        // Get or create the set of favorite categories for this media source
+        if (!this.favorites.has(mediaSource)) {
+            this.favorites.set(mediaSource, new Set());
+        }
+
+        const sourceCategories = this.favorites.get(mediaSource)!;
+
+        // Toggle favorite status
+        if (sourceCategories.has(category)) {
+            sourceCategories.delete(category);
+            this.showUrlMessage('Removed from favorites');
+        } else {
+            sourceCategories.add(category);
+            this.showUrlMessage('Added to favorites');
+        }
+
+        // Create a new map to ensure reactivity in Svelte 5
+        this.favorites = new Map(this.favorites);
+
+        // Save to localStorage
+        this.saveFavorites();
+    }
+
+    isFavorite = (categoryId?: string) => {
+        const category = categoryId || this.selectedCategory;
+        const mediaSource = this.selectedMediaSource;
+
+        if (!category || !mediaSource) return false;
+
+        return this.favorites.has(mediaSource) &&
+            this.favorites.get(mediaSource)!.has(category);
+    }
+
+    loadFavoritesCategory = async () => {
+        // Store if we're showing favorites before potentially clearing it
+        const wasShowingFavorites = this.showFavorites;
+        this.showFavorites = true;
+
+        this.loading = true;
+        this.error = null;
+        this.items = [];
+
+        try {
+            // Get all favorite categories for the current media source
+            const mediaSource = this.selectedMediaSource;
+            if (!this.favorites.has(mediaSource) || this.favorites.get(mediaSource)!.size === 0) {
+                throw new Error('No favorites for this media source');
+            }
+
+            const favoriteCategories = Array.from(this.favorites.get(mediaSource)!);
+
+            // Fetch and combine items from all favorite categories
+            let allItems: ImageItem[] = [];
+
+            for (const category of favoriteCategories) {
+                const endpoint = `/api/${mediaSource}/feed?category=${category}${this.isHD ? '&hd=true' : ''}`;
+                const response = await fetch(endpoint);
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load favorites: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                if (data.items && Array.isArray(data.items)) {
+                    // Add a property to track which category each item belongs to
+                    const categoryName = this.categories.find(c => c.id === category)?.name || category;
+                    const itemsWithCategory = data.items.map((item: ImageItem) => ({
+                        ...item,
+                        sourceCategory: categoryName
+                    }));
+
+                    allItems = [...allItems, ...itemsWithCategory];
+                }
+            }
+
+            if (allItems.length === 0) {
+                throw new Error('No items found in your favorites');
+            }
+
+            // Shuffle items to mix categories
+            this.items = this.shuffleArray(allItems);
+            this.currentIndex = 0;
+
+            // Update URL to reflect we're viewing favorites
+            const url = new URL(window.location.href);
+            url.searchParams.set('favorites', 'true');
+            pushState(url.toString(), {});
+
+            // Start auto slide if not paused
+            if (!this.isPaused) {
+                this.startAutoSlide();
+            }
+
+            // Update document title
+            this.updateDocumentTitle();
+        } catch (error: any) {
+            console.error('Error loading favorites:', error);
+            this.error = error.message || 'Failed to load favorites';
+            this.showFavorites = wasShowingFavorites; // Restore previous state
+        } finally {
+            this.loading = false;
+        }
+    }
+
+    loadAllFavorites = async () => {
+        // Store if we're showing favorites before potentially clearing it
+        const wasShowingFavorites = this.showFavorites;
+        this.showFavorites = true;
+
+        this.loading = true;
+        this.error = null;
+        this.items = [];
+
+        try {
+            // Get all media sources that have favorites
+            const mediaSourcesWithFavorites = Array.from(this.favorites.keys());
+            if (mediaSourcesWithFavorites.length === 0) {
+                throw new Error('No favorites found across any media sources');
+            }
+
+            let allItems: ImageItem[] = [];
+
+            // For each media source with favorites
+            for (const mediaSource of mediaSourcesWithFavorites) {
+                const favoriteCategories = Array.from(this.favorites.get(mediaSource)!);
+
+                // For each favorite category in this media source
+                for (const category of favoriteCategories) {
+                    const endpoint = `/api/${mediaSource}/feed?category=${category}${this.isHD ? '&hd=true' : ''}`;
+                    const response = await fetch(endpoint);
+
+                    if (!response.ok) {
+                        console.warn(`Failed to load favorites from ${mediaSource}/${category}: ${response.statusText}`);
+                        continue; // Skip this category but continue with others
+                    }
+
+                    const data = await response.json();
+                    if (data.items && Array.isArray(data.items)) {
+                        // Add properties to track source and category
+                        const sourceName = this.mediaSources.find(s => s.id === mediaSource)?.name || mediaSource;
+                        const categoryName = this.categories.find(c => c.id === category)?.name || category;
+                        const itemsWithSource = data.items.map((item: ImageItem) => ({
+                            ...item,
+                            sourceCategory: `${sourceName} - ${categoryName}`
+                        }));
+
+                        allItems = [...allItems, ...itemsWithSource];
+                    }
+                }
+            }
+
+            if (allItems.length === 0) {
+                throw new Error('No items found in your favorites');
+            }
+
+            // Shuffle items to mix sources and categories
+            this.items = this.shuffleArray(allItems);
+            this.currentIndex = 0;
+
+            // Update URL to reflect we're viewing all favorites
+            const url = new URL(window.location.href);
+            url.searchParams.set('favorites', 'true');
+            url.searchParams.set('all_sources', 'true');
+            pushState(url.toString(), {});
+
+            // Start auto slide if not paused
+            if (!this.isPaused) {
+                this.startAutoSlide();
+            }
+
+            // Update document title
+            this.updateDocumentTitle();
+        } catch (error: any) {
+            console.error('Error loading all favorites:', error);
+            this.error = error.message || 'Failed to load favorites';
+            this.showFavorites = wasShowingFavorites; // Restore previous state
+        } finally {
+            this.loading = false;
+        }
+    }
+
+    toggleShowFavorites = () => {
+        if (this.showFavorites) {
+            // If we're already showing favorites, go back to regular view
+            this.showFavorites = false;
+            this.loadCategory();
+        } else {
+            // Check if we should show all favorites or just current source
+            const urlParams = new URLSearchParams(window.location.search);
+            const showAllSources = urlParams.get('all_sources') === 'true';
+
+            if (showAllSources) {
+                this.loadAllFavorites();
+            } else {
+                this.loadFavoritesCategory();
+            }
+        }
+    }
+
+    loadLikedImages = () => {
+        try {
+            const likedImagesData = localStorage.getItem('galleryLikedImages');
+            if (likedImagesData) {
+                this.likedImages = JSON.parse(likedImagesData);
+            }
+        } catch (error) {
+            console.error('Error loading liked images:', error);
+        }
+    }
+
+    saveLikedImages = () => {
+        try {
+            localStorage.setItem('galleryLikedImages', JSON.stringify(this.likedImages));
+        } catch (error) {
+            console.error('Error saving liked images:', error);
+        }
+    }
+
+    toggleLikeImage = () => {
+        if (!this.currentItem) return;
+
+        const isLiked = this.isImageLiked();
+        if (isLiked) {
+            // Remove from liked images
+            this.likedImages = this.likedImages.filter(img => img.id !== this.currentItem?.id);
+            this.saveLikedImages();
+
+            // If we're viewing liked images, remove from current view
+            if (this.showLikedImages) {
+                this.items = this.items.filter(item => item.id !== this.currentItem?.id);
+                if (this.items.length === 0) {
+                    // If no more liked images, exit liked images view
+                    this.showLikedImages = false;
+                    this.updateURL();
+                    this.updateDocumentTitle();
+                } else {
+                    // Adjust current index if needed
+                    this.currentIndex = Math.min(this.currentIndex, this.items.length - 1);
+                }
+            }
+        } else {
+            // Add to liked images with source information
+            if (this.currentItem) {
+                const likedImage = {
+                    ...this.currentItem,
+                    sourceCategory: this.getCurrentCategoryName(),
+                    media_source: this.selectedMediaSource
+                };
+                this.likedImages.push(likedImage);
+                this.saveLikedImages();
+            }
+        }
+    }
+
+    isImageLiked = () => {
+        if (!this.currentItem) return false;
+        return this.likedImages.some(img => img.id === this.currentItem?.id);
+    }
+
+    loadLikedImagesView = async () => {
+        // Store if we're showing liked images before potentially clearing it
+        const wasShowingLikedImages = this.showLikedImages;
+        this.showLikedImages = true;
+
+        this.loading = true;
+        this.error = null;
+
+        try {
+            if (this.likedImages.length === 0) {
+                throw new Error('No liked images found');
+            }
+
+            // Use the stored liked images directly
+            this.items = this.shuffleArray([...this.likedImages]);
+            this.currentIndex = 0;
+
+            // Update URL to reflect we're viewing liked images
+            const url = new URL(window.location.href);
+            url.searchParams.set('liked', 'true');
+            pushState(url.toString(), {});
+
+            // Start auto slide if not paused
+            if (!this.isPaused) {
+                this.startAutoSlide();
+            }
+
+            // Update document title
+            this.updateDocumentTitle();
+        } catch (error: any) {
+            console.error('Error loading liked images:', error);
+            this.error = error.message || 'Failed to load liked images';
+            this.showLikedImages = wasShowingLikedImages; // Restore previous state
+        } finally {
+            this.loading = false;
+        }
+    }
+
+    toggleShowLikedImages = () => {
+        if (this.showLikedImages) {
+            // If we're already showing liked images, go back to regular view
+            this.showLikedImages = false;
+            this.loadCategory();
+        } else {
+            this.loadLikedImagesView();
+        }
     }
 }
 

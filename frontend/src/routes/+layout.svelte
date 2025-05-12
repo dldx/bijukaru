@@ -93,6 +93,22 @@
                             <td><span class="key">/</span></td>
                             <td>Open search {#if !galleryState.isSearchAuthorized}<span class="text-yellow-300">(requires token)</span>{/if}</td>
                         </tr>
+                        <tr>
+                            <td><span class="key">S</span></td>
+                            <td>Toggle favorite for current category</td>
+                        </tr>
+                        <tr>
+                            <td><span class="key">V</span></td>
+                            <td>View favorites for current media source</td>
+                        </tr>
+                        <tr>
+                            <td><span class="key">L</span></td>
+                            <td>Like/unlike current image</td>
+                        </tr>
+                        <tr>
+                            <td><span class="key">I</span></td>
+                            <td>View all liked images</td>
+                        </tr>
                     </tbody>
                 </table>
                 <div class="opacity-70 mt-6 text-sm text-center">
@@ -352,13 +368,68 @@
                                 class="flex-1 font-semibold hover:underline basis-1/2">
                                 <h2 class="font-semibold">{galleryState.currentItem.title}</h2>
                             </a>
+                            <!-- Like Image Button -->
+                            <button
+                                onclick={() => galleryState.toggleLikeImage()}
+                                aria-label="Like/unlike current image"
+                                title="Like/unlike current image (L)"
+                                class="hover:bg-gray-200 dark:hover:bg-gray-700 ml-2 p-2 rounded-full focus:outline-none cursor-pointer"
+                                class:text-red-500={galleryState.isImageLiked()}
+                                class:text-gray-600={!galleryState.isImageLiked()}
+                                class:dark:text-gray-400={!galleryState.isImageLiked()}>
+                                <svg xmlns="http://www.w3.org/2000/svg"
+                                    class="w-5 h-5"
+                                    fill={galleryState.isImageLiked() ? "currentColor" : "none"}
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                </svg>
+                            </button>
                         {/if}
                         <div class:hidden={!galleryState.selectedCategory}
                             class:mobile-truncate={galleryState.selectedMediaSource !== 'wikiart'}
-                        class="bg-black/50 ml-3 px-3 py-1 rounded-full text-sm">
+                        class="flex items-center bg-black/50 ml-3 px-3 py-1 rounded-full text-sm">
                         <span>{galleryState.getCurrentCategoryName()}</span>
+                        <!-- Favorite Star Icon -->
+                        <button
+                            onclick={(e) => { e.stopPropagation(); galleryState.toggleFavorite(); }}
+                            class="ml-2 focus:outline-none"
+                            title={galleryState.isFavorite() ? "Remove from favorites" : "Add to favorites"}>
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                class="w-5 h-5"
+                                fill={galleryState.isFavorite() ? "currentColor" : "none"}
+                                viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                            </svg>
+                        </button>
                         </div>
                     </div>
+
+                    <!-- Favorites view indicator -->
+                    {#if galleryState.showFavorites}
+                        <div class="favorites-indicator">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                            </svg>
+                            <span>
+                                {#if new URLSearchParams(window.location.search).get('all_sources') === 'true'}
+                                    Viewing all favorites across all media sources
+                                {:else}
+                                    Viewing favorites from {galleryState.currentSourceName}
+                                {/if}
+                                {#if galleryState.currentItem?.sourceCategory}
+                                    - {galleryState.currentItem.sourceCategory}
+                                {/if}
+                            </span>
+                        </div>
+                    {/if}
 
                     <!-- Description overlay -->
                     {#if galleryState.showDescription && galleryState.currentItem?.description}
@@ -423,6 +494,48 @@
                             class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none text-gray-600 dark:text-gray-400 cursor-pointer">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+
+                    <!-- Favorites Button -->
+                    <button
+                        onclick={() => galleryState.toggleShowFavorites()}
+                        aria-label="Toggle favorites view"
+                        title="Toggle favorites view"
+                        class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none cursor-pointer"
+                        class:text-yellow-500={galleryState.showFavorites}
+                        class:text-gray-600={!galleryState.showFavorites}
+                        class:dark:text-gray-400={!galleryState.showFavorites}>
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                            class="w-5 h-5"
+                            fill={galleryState.showFavorites ? "currentColor" : "none"}
+                            viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                        </svg>
+                    </button>
+
+                    <!-- View All Liked Images Button -->
+                    <button
+                        onclick={() => galleryState.toggleShowLikedImages()}
+                        aria-label="View all liked images"
+                        title="View all liked images (I)"
+                        class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none cursor-pointer"
+                        class:text-red-500={galleryState.showLikedImages}
+                        class:text-gray-600={!galleryState.showLikedImages}
+                        class:dark:text-gray-400={!galleryState.showLikedImages}>
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                            class="w-5 h-5"
+                            fill={galleryState.showLikedImages ? "currentColor" : "none"}
+                            viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                         </svg>
                     </button>
 
@@ -536,6 +649,21 @@
                             </svg>
                         </span>
                     </div>
+
+                    <!-- Liked Images View Indicator -->
+                    {#if galleryState.showLikedImages}
+                        <div class="liked-images-indicator">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                            </svg>
+                            <span>
+                                Viewing your liked images
+                                {#if galleryState.currentItem?.sourceCategory}
+                                    - {galleryState.currentItem.sourceCategory}
+                                {/if}
+                            </span>
+                        </div>
+                    {/if}
                 </div>
             </div>
 
@@ -859,5 +987,72 @@ input:checked + .toggle-slider:before {
 }
 .dark .control-bar {
     border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.favorites-indicator {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: #fbbf24;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    z-index: 50;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.favorites-indicator svg {
+    width: 1rem;
+    height: 1rem;
+    stroke: currentColor;
+}
+
+.control-button {
+    background: transparent;
+    border: none;
+    color: currentColor;
+    padding: 0.5rem;
+    cursor: pointer;
+    border-radius: 0.25rem;
+    transition: background-color 0.2s;
+}
+
+.control-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.control-button svg {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.liked-images-indicator {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: #ef4444;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    z-index: 50;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.liked-images-indicator svg {
+    width: 1rem;
+    height: 1rem;
+    stroke: currentColor;
 }
 </style>

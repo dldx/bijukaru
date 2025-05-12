@@ -2,9 +2,6 @@ from typing import Optional, Literal, Dict, List, ClassVar, get_args, Any
 
 from pydantic import BaseModel, Field
 
-# Assuming Category lives in schema.py based on other files
-from schema import Category
-
 # Import category fetching functions
 from apod import get_apod_categories
 from guardian_photos import get_guardian_categories
