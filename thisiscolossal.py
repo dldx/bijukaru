@@ -18,7 +18,7 @@ class ThisIsColossalCategory(Category):
 def get_thisiscolossal_categories():
     # Return the list of categories
     categories = [
-        ThisIsColossalCategory(id="", name="All Posts"),
+        ThisIsColossalCategory(id="all-posts", name="All Posts"),
         ThisIsColossalCategory(id="art", name="Art"),
         ThisIsColossalCategory(id="craft", name="Craft"),
         ThisIsColossalCategory(id="design", name="Design"),
@@ -39,9 +39,9 @@ def get_thisiscolossal_categories():
     return categories
 
 
-async def get_thisiscolossal_feed(category: Optional[str] = None):
+async def get_thisiscolossal_feed(category: Optional[str] = "all-posts"):
     # Construct the feed URL based on the category
-    if category:
+    if category != "all-posts":
         feed_url = f"https://www.thisiscolossal.com/category/{category}/feed/"
     else:
         feed_url = "https://www.thisiscolossal.com/feed/"

@@ -15,4 +15,5 @@ dependencies = [
     "requests>=2.32.3",
     "orjson>=3.10.16",
     "pydantic-ai>=0.1.8",
+    "dateparser>=1.2.1",
 ]

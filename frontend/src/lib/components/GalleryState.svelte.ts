@@ -8,9 +8,10 @@ interface ImageItem {
     image_url: string;
     link: string;
     description?: string;
-    sourceCategory?: string;
+    sourceCategory?: string; // Display string like "Source Name - Category Name"
     artist_name?: string;
-    media_source?: string;
+    media_source?: string;   // This should be the media source ID
+    category_id?: string;    // Actual category ID for this item
 }
 
 interface MediaSource {
@@ -22,6 +23,14 @@ interface MediaSource {
 interface Category {
     id: string;
     name: string;
+}
+
+interface ArchivedCuratedFeed {
+    id: string; // ID of the curated feed (e.g., from result.category.id)
+    name: string; // Name/title of the curated feed (e.g., from result.category.name)
+    originalQuery: string; // The user's query that generated this feed
+    items: ImageItem[]; // The actual items (images) in the feed
+    userfriendly_message?: string; // Optional message to display when loaded
 }
 
 // Define the GalleryState interface
@@ -119,11 +128,11 @@ interface GalleryState {
     handleImageError: (event: Event) => void;
     refreshRandomArtist: () => void;
     toggleHD: () => void;
-    changeMediaSource: () => void;
+    changeMediaSource: (newSourceId?: string) => void;
     showTemporaryMediaSourceOverlay: () => void;
     shuffleArray: (array: any[]) => any[];
-    toggleFavorite: (categoryId?: string) => void;
-    isFavorite: (categoryId?: string) => boolean;
+    toggleFavorite: (categoryIdInput?: string, mediaSourceIdInput?: string) => void;
+    isFavorite: (categoryIdInput?: string, mediaSourceIdInput?: string) => boolean;
     loadFavorites: () => void;
     saveFavorites: () => void;
     loadFavoritesCategory: () => Promise<void>;
@@ -135,7 +144,14 @@ interface GalleryState {
     saveLikedImages: () => void;
     loadLikedImagesView: () => Promise<void>;
     toggleShowLikedImages: () => void;
+    updateProgressBar: () => void;
+    loadArchivedCuratedFeeds: () => void;
+    saveArchivedCuratedFeeds: () => void;
 }
+
+export const FAVORITES_CATEGORY_ID = 'favorites';
+export const LIKED_CATEGORY_ID = 'liked';
+export const BIJUKARU_CUSTOM_SOURCE_ID = 'bijukaru_all_sources';
 
 export class GalleryStateClass implements GalleryState {
     loading = $state(true);
@@ -193,13 +209,27 @@ export class GalleryStateClass implements GalleryState {
     likedImages = $state<ImageItem[]>([]);
     showLikedImages = $state(false);
 
+    // State to remember the last selected source/category before viewing custom feeds
+    previousSelectedMediaSource = $state<string | null>(null);
+    previousSelectedCategory = $state<string | null>(null);
+
+    // State for storing previously generated curated feeds
+    archivedCuratedFeeds = $state<ArchivedCuratedFeed[]>([]);
+
     // Computed property for current item
     get currentItem() {
         return this.items[this.currentIndex] || null;
     }
 
     get currentCategoryName() {
-        return this.category ? this.category.name : this.getCurrentCategoryName();
+        if (this.showFavorites) {
+            return this.currentItem?.sourceCategory || 'Favorites'; // Display specific category for favorited item
+        }
+        if (this.showLikedImages) return 'Liked Images';
+        // Handle curated stories - assuming title is stored in a way accessible here
+        // For now, let's use the fetched category name or a fallback
+        if (this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID) return this.category?.name || 'Curated Story';
+        return this.category ? this.category.name : (this.categories.find(c => c.id === this.selectedCategory)?.name || this.selectedCategory || 'Loading...');
     }
 
     get currentSourceName() {
@@ -213,6 +243,9 @@ export class GalleryStateClass implements GalleryState {
 
         // Load favorites from localStorage
         this.loadFavorites();
+
+        // Load archived curated feeds from localStorage
+        this.loadArchivedCuratedFeeds();
 
         // Track mouse position
         this.mouseX = 0;
@@ -230,7 +263,14 @@ export class GalleryStateClass implements GalleryState {
         // Check for URL parameters
         const urlParams = new URLSearchParams(window.location.search);
 
-        // Check for message parameter
+        // Check for message stored in localStorage from search redirect
+        const storedMessage = localStorage.getItem('bijukaru_message');
+        if (storedMessage) {
+            this.showUrlMessage(storedMessage);
+            localStorage.removeItem('bijukaru_message'); // Clear after showing
+        }
+
+        // Check for message parameter (for direct link sharing)
         const message = urlParams.get('message');
         if (message) {
             // Display the message overlay
@@ -437,6 +477,9 @@ export class GalleryStateClass implements GalleryState {
         // Load liked images from localStorage
         this.loadLikedImages();
 
+        // Load archived curated feeds from localStorage
+        this.loadArchivedCuratedFeeds();
+
         // Check for liked images view parameter
         const likedParam = urlParams.get('liked');
         if (likedParam === 'true') {
@@ -602,12 +645,7 @@ export class GalleryStateClass implements GalleryState {
         // Prefetch next images after changing the current image
         this.prefetchNextImages();
 
-        // Reset progress bar
-        if (this.progressBar) {
-            this.animateProgressBar();
-        }
-
-        // Reset autoslide timer
+        // Reset autoslide timer. startAutoSlide will handle the progress bar.
         this.stopAutoSlide();
         this.startAutoSlide();
     }
@@ -643,8 +681,23 @@ export class GalleryStateClass implements GalleryState {
 
     // Start auto slideshow
     startAutoSlide = () => {
-        // Don't start auto-slide if interval is 0
-        if (this.slideInterval === 0) {
+        // Always clear any existing interval before starting a new one.
+        // This ensures only one timer is active.
+        if (this.autoSlideIntervalId) {
+            clearInterval(this.autoSlideIntervalId);
+            this.autoSlideIntervalId = null;
+        }
+
+        // Do not start if paused or if the interval is 0.
+        if (this.isPaused || this.slideInterval === 0) {
+            // Ensure progress bar is also stopped/reset if we are not starting.
+            if (this.progressBar) {
+                this.progressBar.style.width = '0%';
+                if (this.progressAnimation) {
+                    cancelAnimationFrame(this.progressAnimation);
+                    this.progressAnimation = null;
+                }
+            }
             return;
         }
 
@@ -652,7 +705,7 @@ export class GalleryStateClass implements GalleryState {
             this.nextItem();
         }, this.slideInterval) as unknown as number;
 
-        // Reset and start progress bar animation
+        // Reset and start progress bar animation.
         this.animateProgressBar();
     }
 
@@ -713,15 +766,17 @@ export class GalleryStateClass implements GalleryState {
     togglePause = () => {
         this.isPaused = !this.isPaused;
 
-        if (this.isPaused) {
-            // Store current interval and pause
-            this.originalInterval = this.slideInterval;
-            this.slideInterval = 0;
-            this.stopAutoSlide();
-        } else {
-            // Restore original interval and resume
-            this.slideInterval = this.originalInterval;
-            this.startAutoSlide();
+        if (this.isPaused) { // PAUSING
+            // If slideshow was running (slideInterval > 0), store its interval.
+            if (this.slideInterval > 0) {
+                this.originalInterval = this.slideInterval;
+            }
+            this.stopAutoSlide(); // Stop the timer and reset progress bar.
+            this.slideInterval = 0; // Reflect that no auto-sliding should happen.
+        } else { // UNPAUSING
+            // Restore the interval that was active before pausing, or default.
+            this.slideInterval = this.originalInterval > 0 ? this.originalInterval : 10000; // Default to 10s
+            this.startAutoSlide(); // Start the timer with the restored interval.
         }
 
         // Update URL
@@ -892,19 +947,53 @@ export class GalleryStateClass implements GalleryState {
     }
 
     // Load categories
-    loadCategories = async () => {
+    loadCategories = async (): Promise<void> => {
+        this.error = null;
+        this.loading = true;
+
         try {
-            const response = await fetch(`/api/${this.selectedMediaSource}/categories`);
-            if (!response.ok) {
-                throw new Error('Failed to fetch categories');
+            if (this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID) {
+                // Build categories for "All Sources"
+                const customCategories: Category[] = [
+                    { id: FAVORITES_CATEGORY_ID, name: 'Favorites' },
+                    { id: LIKED_CATEGORY_ID, name: 'Liked Images' },
+                    // Add archived curated feeds (map to Category for dropdown)
+                    ...this.archivedCuratedFeeds.map(feed => ({ id: feed.id, name: feed.name }))
+                ];
+                this.categories = customCategories;
+
+                // Default to Favorites if no specific custom view is active or set
+                if (!this.showFavorites && !this.showLikedImages && (!this.selectedCategory || !customCategories.find(c => c.id === this.selectedCategory))) {
+                    this.selectedCategory = FAVORITES_CATEGORY_ID;
+                } else if (this.showFavorites) {
+                    this.selectedCategory = FAVORITES_CATEGORY_ID;
+                } else if (this.showLikedImages) {
+                    this.selectedCategory = LIKED_CATEGORY_ID;
+                }
+                // If a curated story was just loaded, selectedCategory would be its ID, which is fine.
+
+                this.categoryIndex = Math.max(0, this.categories.findIndex(c => c.id === this.selectedCategory));
+                this.category = this.categories[this.categoryIndex];
+
+            } else {
+            // Fetch categories for regular media sources
+                const response = await fetch(`/api/${this.selectedMediaSource}/categories`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch categories');
+                }
+                this.categories = await response.json();
+                if (this.categories.length > 0 && (!this.selectedCategory || !this.categories.find(c => c.id === this.selectedCategory))) {
+                    this.selectedCategory = this.categories[0].id; // Default to first category for regular sources
+                    this.categoryIndex = 0;
+                    this.category = this.categories[0];
+                }
             }
-            this.categories = await response.json();
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error loading categories:', err);
-            // Fallback to default categories if API fails
-            this.categories = [
-                { id: "", name: "All Posts" },
-            ];
+            this.error = err.message || "Error loading categories";
+            this.categories = [{ id: "", name: "Error" }]; // Fallback
+        } finally {
+            this.loading = false;
         }
     }
 
@@ -913,9 +1002,55 @@ export class GalleryStateClass implements GalleryState {
         // Clear error
         this.error = null;
 
-        // Check if we should load favorites instead
-        if (this.showFavorites) {
-            return this.loadFavoritesCategory();
+        // Handle custom source selections first
+        if (this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID) {
+            if (this.selectedCategory === FAVORITES_CATEGORY_ID) {
+                this.showFavorites = true; // Ensure flag is set
+                this.showLikedImages = false;
+                return this.loadAllFavorites();
+            } else if (this.selectedCategory === LIKED_CATEGORY_ID) {
+                this.showLikedImages = true; // Ensure flag is set
+                this.showFavorites = false;
+                return this.loadLikedImagesView();
+            } else {
+                // This branch will handle loading specific curated feeds by ID in the future
+                // For now, if it's a curated feed that was just loaded by performSearch,
+                // items and category are already set. If user re-selects from dropdown,
+                // we might need to re-load/re-fetch it.
+                // If no items for a curated category, show error or clear.
+                if (this.items.length === 0 && this.category?.id === this.selectedCategory) {
+                    // This means a curated category is selected but has no items (e.g., reselected from dropdown after navigating away)
+                    // Find the feed and try to reload it
+                    const feedToReload = this.archivedCuratedFeeds.find(f => f.id === this.selectedCategory);
+                    if (feedToReload) {
+                        console.log(`Reloading curated feed: ${feedToReload.name}`);
+                        return this._loadSpecificCuratedFeed(feedToReload);
+                    } else {
+                        console.warn(`Selected category ${this.selectedCategory} looks like a curated feed ID, but not found in archive.`);
+                        this.error = `Cannot load curated feed: ${this.selectedCategory}`;
+                        this.loading = false;
+                        return;
+                    }
+                } else if (this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID &&
+                    ![FAVORITES_CATEGORY_ID, LIKED_CATEGORY_ID].includes(this.selectedCategory)) {
+
+                    const feedToLoad = this.archivedCuratedFeeds.find(f => f.id === this.selectedCategory);
+                    if (feedToLoad) {
+                        // Found an archived feed matching the selected category ID
+                        console.log(`Loading archived curated feed: ${feedToLoad.name}`);
+                        // Directly load from the archive, no async needed here
+                        this._loadSpecificCuratedFeed(feedToLoad);
+                        return; // Loading handled, exit
+                    } else {
+                        // The selected ID looks like a curated one, but wasn't found in the archive
+                        console.warn(`Selected category ${this.selectedCategory} not found in archived feeds.`);
+                        this.error = `Could not load archived feed: ${this.selectedCategory}`;
+                        this.items = []; // Clear items
+                        this.loading = false;
+                        return;
+                    }
+                }
+            }
         }
 
         // Show loading state
@@ -1052,6 +1187,12 @@ export class GalleryStateClass implements GalleryState {
             return;
         }
 
+        // If help screen is visible, Escape should close it
+        if (this.showHelp && e.key === 'Escape') {
+            this.showHelp = false;
+            return;
+        }
+
         switch (e.key) {
             case 'ArrowRight':
                 this.nextItem();
@@ -1098,6 +1239,7 @@ export class GalleryStateClass implements GalleryState {
             case '/':
                 if (this.isSearchAuthorized) {
                     this.openSearchOverlay();
+                    e.preventDefault(); // Prevent typing '/' in the input
                 }
                 break;
             case 's':
@@ -1150,25 +1292,43 @@ export class GalleryStateClass implements GalleryState {
 
     // Method stubs for remaining methods referenced in init()
     loadMediaSources = async () => {
+        this.loading = true;
+        this.error = null;
         try {
             const response = await fetch('/api/media_sources');
             if (!response.ok) {
-                throw new Error('Failed to fetch media sources');
+                throw new Error(`Failed to load media sources: ${response.statusText}`);
             }
-            this.mediaSources = await response.json();
-        } catch (err) {
-            console.error('Error loading media sources:', err);
-            // Fallback to default sources if API fails
+            const sources: MediaSource[] = await response.json();
             this.mediaSources = [
-                { id: "thisiscolossal", name: "This is Colossal" },
-                { id: "apod", name: "Astronomy Picture of the Day" },
-                { id: "ukiyo-e", name: "Ukiyo-e" },
-                { id: "guardian", name: "Guardian" },
-                { id: "reddit", name: "Reddit" },
-                { id: "wikiart", name: "WikiArt" }
+                ...sources,
+                { id: BIJUKARU_CUSTOM_SOURCE_ID, name: 'All Sources', hdSupported: true } // Add custom source
             ];
+
+            // Check if the current selectedMediaSource from URL is valid, if not, default
+            const urlParams = new URLSearchParams(window.location.search);
+            const sourceFromUrl = urlParams.get('media_source');
+            if (sourceFromUrl && this.mediaSources.find(s => s.id === sourceFromUrl)) {
+                this.selectedMediaSource = sourceFromUrl;
+            } else if (this.mediaSources.length > 0 && !this.mediaSources.find(s => s.id === this.selectedMediaSource)) {
+                // If current selection is invalid (e.g. after custom view), and no valid URL param, pick first non-custom
+                const firstValidSource = this.mediaSources.find(s => s.id !== BIJUKARU_CUSTOM_SOURCE_ID);
+                this.selectedMediaSource = firstValidSource ? firstValidSource.id : (this.mediaSources[0]?.id || '');
+            } else if (this.mediaSources.length > 0 && this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID && !sourceFromUrl) {
+                // If coming from a custom view, default to the first non-custom source
+                const firstValidSource = this.mediaSources.find(s => s.id !== BIJUKARU_CUSTOM_SOURCE_ID);
+                this.selectedMediaSource = firstValidSource ? firstValidSource.id : (this.mediaSources[0]?.id || '');
+            }
+
+            this.hdSupported = this.mediaSources.find(s => s.id === this.selectedMediaSource)?.hdSupported || false;
+
+        } catch (err: any) {
+            this.error = err.message;
+            this.mediaSources = [{ id: BIJUKARU_CUSTOM_SOURCE_ID, name: 'All Sources', hdSupported: true }]; // Ensure custom source is always available
+        } finally {
+            this.loading = false;
         }
-    }
+    };
 
     verifyAndStoreToken = async (token: string) => {
         this.searchToken = token;
@@ -1289,130 +1449,171 @@ export class GalleryStateClass implements GalleryState {
         this.error = null;
 
         try {
-            const response = await fetch(`/api/search?query=${encodeURIComponent(this.searchQuery)}&token=${encodeURIComponent(this.searchToken)}`);
+            // Determine if it's a curation query
+            const keywords = ["story", "narrative", "curate", "tell me about", "life of", "teach me about"];
+            const isCurationQuery = keywords.some(keyword => this.searchQuery.toLowerCase().includes(keyword));
+            const token = localStorage.getItem('searchToken') || this.searchToken;
+
+            let url;
+            if (isCurationQuery) {
+                console.log("Performing curation query...");
+                url = `/api/curate?query=${encodeURIComponent(this.searchQuery)}&token=${encodeURIComponent(token)}`;
+            } else {
+                console.log("Performing standard search query...");
+                url = `/api/search?query=${encodeURIComponent(this.searchQuery)}&token=${encodeURIComponent(token)}`;
+            }
+
+            const response = await fetch(url);
             const result = await response.json();
 
-            if (response.ok) {
-                // Close search overlay immediately
-                this.closeSearchOverlay();
+            if (!response.ok) {
+                throw new Error(result.error || `HTTP error ${response.status}`);
+            }
 
-                // Check if we received direct feed results
-                if (result.feed && result.media_source) {
-                    console.log("Search successful, received direct feed results");
+            // Close search overlay immediately
+            this.closeSearchOverlay();
 
-                    // Switch to the appropriate media source if needed
-                    console.log(result.media_source, this.selectedMediaSource);
-                    if (result.media_source !== this.selectedMediaSource) {
-                        this.selectedMediaSource = result.media_source;
-                        this.changeMediaSource();
-                        await this.loadCategories();
+            if (isCurationQuery) {
+                // Handle CuratedFeed response
+                console.log("Received curated feed:", result);
+                if (result.items && result.category) {
+                    // Store previous state if not already in a custom view
+                    if (this.selectedMediaSource !== BIJUKARU_CUSTOM_SOURCE_ID) {
+                        this.previousSelectedMediaSource = this.selectedMediaSource;
+                        this.previousSelectedCategory = this.selectedCategory;
                     }
 
-                    // Create a virtual search results category if it doesn't exist
-                    const searchCategory = { id: "search-results", name: "Search Results" };
-                    if (!this.categories.some(c => c.id === "search-results")) {
-                        this.categories.push(searchCategory);
+                    // Set custom source and load items
+                    this.selectedMediaSource = BIJUKARU_CUSTOM_SOURCE_ID;
+                    this.items = result.items; // Load items from curated feed
+
+                    const currentQuery = this.searchQuery; // Capture before it might be cleared
+                    // Ensure the new category is available and selected
+                    const newCategory: Category = { id: result.category.id, name: result.category.name };
+                    this.category = newCategory; // Update the state's category object
+
+                    // Set categories array for the dropdown
+                    this.categories = [newCategory];
+                    this.categoryIndex = 0;
+
+                    // Save this curated feed to archived list
+                    const existingArchivedIndex = this.archivedCuratedFeeds.findIndex(f => f.id === newCategory.id);
+                    const archivedFeedEntry: ArchivedCuratedFeed = {
+                        id: newCategory.id,
+                        name: newCategory.name,
+                        originalQuery: currentQuery,
+                        items: result.items, // Store the items directly
+                        userfriendly_message: result.userfriendly_message // Store the message
+                    };
+                    if (existingArchivedIndex > -1) {
+                        this.archivedCuratedFeeds[existingArchivedIndex] = archivedFeedEntry; // Update if exists
+                    } else {
+                        this.archivedCuratedFeeds.push(archivedFeedEntry); // Add new
                     }
+                    this.archivedCuratedFeeds = [...this.archivedCuratedFeeds]; // Ensure reactivity for Svelte 5
+                    this.saveArchivedCuratedFeeds();
 
-                    // Switch to search results category
-                    this.selectedCategory = "search-results";
-                    this.categoryIndex = this.categories.findIndex(c => c.id === "search-results");
+                    // Set selectedCategory to the curated category ID for potential URL updates or state consistency
+                    this.selectedCategory = newCategory.id;
 
-                    // Replace the items with search results
-                    this.items = result.feed.items;
+                    // Reset view states
+                    this.showFavorites = false;
+                    this.showLikedImages = false;
+
                     this.currentIndex = 0;
-
-                    // Show message if provided
-                    if (result.userfriendly_message) {
-                        this.overlayMessage = result.userfriendly_message;
-                        this.showMessageOverlay = true;
-                        setTimeout(() => {
-                            this.showMessageOverlay = false;
-                        }, 5000);
+                    if (this.items.length === 0) {
+                        this.error = 'Curated feed is empty.';
+                    } else {
+                        this.error = null;
                     }
 
-                    // Update URL for bookmarking
-                    pushState(result.url.toString(), {});
+                    this.updateProgressBar();
+                    if (result.userfriendly_message) {
+                        this.showUrlMessage(result.userfriendly_message); // Use existing overlay logic
+                    }
+                    if (result.llm_thinking) {
+                        console.log("LLM Thinking:", result.llm_thinking);
+                    }
 
-                    // Update title and start slideshow
+                    // Update URL and title, start slideshow
+                    this.updateURL();
                     this.updateDocumentTitle();
+                    this.prefetchNextImages();
                     this.startAutoSlide();
-                }
-                // Handle URL-based results (existing functionality)
-                else if (result.url) {
-                    console.log("Search successful, received URL:", result.url);
 
-                    // Parse the URL to extract parameters
-                    const urlObj = new URL(window.location.origin + result.url);
-                    const pathSegments = urlObj.pathname.split('/').filter(Boolean);
-                    const searchParams = urlObj.searchParams;
-
-                    // Extract media source from the path
-                    let newMediaSource = searchParams.get('media_source') || this.selectedMediaSource;
-                    const hdParam = searchParams.get('hd') === 'true';
-                    const categoryParam = searchParams.get('category');
-                    const imageIdParam = searchParams.get('image_id');
-
-                    // Show message if provided
-                    if (result.userfriendly_message) {
-                        this.overlayMessage = result.userfriendly_message;
-                        this.showMessageOverlay = true;
-                        setTimeout(() => {
-                            this.showMessageOverlay = false;
-                        }, 5000);
-                    }
-
-                    // Apply search results by updating component state
-                    let mediaSourceChanged = false;
-
-                    // Change media source if needed
-                    if (newMediaSource !== this.selectedMediaSource) {
-                        this.selectedMediaSource = newMediaSource;
-                        mediaSourceChanged = true;
-
-                        // Load categories for the new media source
-                        await this.loadCategories();
-                    }
-
-                    // Update HD settings if specified
-                    if (hdParam !== undefined) {
-                        this.isHD = hdParam;
-                    }
-
-                    // Update category if specified
-                    if (categoryParam) {
-                        this.selectedCategory = categoryParam;
-                        // Find index of this category
-                        this.categoryIndex = Math.max(0, this.categories.findIndex(c => c.id === categoryParam));
-                    }
-
-                    // Set target image ID to jump to after loading
-                    if (imageIdParam) {
-                        this.targetImageId = imageIdParam;
-                    }
-
-                    // Load the appropriate content
-                    await this.loadCategory();
-
-                    // Update the URL without refreshing
-                    pushState(result.url.toString(), {});
-
-                    // Update document title
-                    this.updateDocumentTitle();
                 } else {
-                    throw new Error('Search returned invalid results');
+                    throw new Error("Invalid curated feed response from server.");
                 }
             } else {
-                throw new Error(result.error || 'Search failed');
+                // Handle regular search response (URL redirect)
+                console.log("Search successful, received URL:", result.url);
+                if (result.url) {
+                // Store message to show on next page load
+                    if (result.userfriendly_message) {
+                        localStorage.setItem('bijukaru_message', result.userfriendly_message);
+                    }
+                    // Navigate using SvelteKit's goto or directly setting window.location
+                    // Using window.location ensures parameters are processed by init on reload
+                    window.location.href = result.url;
+                } else {
+                    throw new Error("Invalid search response from server.");
+                }
             }
+
         } catch (err: any) {
-            console.error('Search error:', err);
-            this.error = err.message || 'An error occurred during the search.';
+            console.error('Search/Curation error:', err);
+            this.error = err.message || 'An error occurred during the search/curation.';
         } finally {
             this.loading = false;
         }
     }
-    changeMediaSource = async () => {
+    changeMediaSource = async (newSourceId?: string) => {
+        const targetSourceId = newSourceId ?? this.selectedMediaSource; // The source we are switching *to*
+        const currentSourceId = this.selectedMediaSource; // The source we are switching *from*
+
+        // If switching away from a custom view, clear relevant flags
+        if (currentSourceId === BIJUKARU_CUSTOM_SOURCE_ID && targetSourceId !== BIJUKARU_CUSTOM_SOURCE_ID) {
+            console.log("Switching FROM custom source TO regular source:", targetSourceId);
+            this.showFavorites = false;
+            this.showLikedImages = false;
+            // If we have a previously saved state, restore it
+            if (this.previousSelectedMediaSource && this.previousSelectedCategory) {
+                console.log("Restoring previous state:", this.previousSelectedMediaSource, this.previousSelectedCategory);
+                this.selectedMediaSource = this.previousSelectedMediaSource;
+                this.selectedCategory = this.previousSelectedCategory;
+                this.previousSelectedMediaSource = null; // Clear saved state
+                this.previousSelectedCategory = null;
+                // Need to call loadCategory to refresh based on restored state
+                await this.loadCategory();
+                return; // Exit early as loadCategory handles loading/URL updates
+            } else {
+                console.log("No previous state to restore, proceeding with target:", targetSourceId);
+                // If no saved state, proceed with the targetSourceId (likely selected from dropdown)
+                this.selectedMediaSource = targetSourceId;
+            }
+        } else if (targetSourceId === BIJUKARU_CUSTOM_SOURCE_ID && currentSourceId !== BIJUKARU_CUSTOM_SOURCE_ID) {
+            // Switching TO the custom source manually from a regular source
+            console.log("Switching TO custom source FROM regular source:", currentSourceId);
+            // Store the state we are leaving
+            this.previousSelectedMediaSource = currentSourceId;
+            this.previousSelectedCategory = this.selectedCategory;
+
+            this.selectedMediaSource = BIJUKARU_CUSTOM_SOURCE_ID;
+            // Clear flags that might be incorrectly set
+            this.showFavorites = false;
+            this.showLikedImages = false;
+            // `loadCategories` will set the default custom category (e.g., Favorites)
+            await this.loadCategories(); // This will setup categories: Favorites, Liked
+            await this.loadCategory();   // This will load the default (Favorites)
+            this.updateURL();
+            return; // Exit after handling manual switch TO custom source
+        }
+        // If we reach here, it's either:
+        // 1. Switching between two regular sources
+        // 2. Switching away from custom source without saved state (handled by fallthrough)
+        // 3. An internal state update (e.g. from toggleShowFavorites setting source) - less likely via this func
+        console.log("Proceeding with regular source change or fallthrough:", targetSourceId);
+        this.selectedMediaSource = targetSourceId;
 
         // Show loading state
         this.loading = true;
@@ -1460,7 +1661,7 @@ export class GalleryStateClass implements GalleryState {
             }
 
             // Update URL without reloading
-            const newUrl = `/?media_source=${this.selectedMediaSource}&${urlParams.toString()}`;
+            const newUrl = `/?media_source=${targetSourceId}&${urlParams.toString()}`;
             pushState(newUrl, { mediaSource: this.selectedMediaSource });
 
             // Update document title
@@ -1483,7 +1684,6 @@ export class GalleryStateClass implements GalleryState {
         } finally {
             this.loading = false;
         }
-
     }
     refreshRandomArtist = () => {
         if (this.selectedCategory === 'random-artist') {
@@ -1550,38 +1750,98 @@ export class GalleryStateClass implements GalleryState {
         }
     }
 
-    toggleFavorite = (categoryId?: string) => {
-        const category = categoryId || this.selectedCategory;
-        const mediaSource = this.selectedMediaSource;
+    toggleFavorite = (categoryIdInput?: string, mediaSourceIdInput?: string) => {
+        const mediaSource = mediaSourceIdInput || (this.showFavorites && this.currentItem?.media_source) || this.selectedMediaSource;
+        const category = categoryIdInput || (this.showFavorites && this.currentItem?.category_id) || this.selectedCategory;
 
-        if (!category || !mediaSource) return;
+        if (!category || !mediaSource) {
+            console.warn("ToggleFavorite: category or mediaSource missing", category, mediaSource);
+            return;
+        }
 
-        // Get or create the set of favorite categories for this media source
         if (!this.favorites.has(mediaSource)) {
             this.favorites.set(mediaSource, new Set());
         }
 
         const sourceCategories = this.favorites.get(mediaSource)!;
+        // let isNowFavorite = false; // This variable was declared but its value never read.
 
-        // Toggle favorite status
         if (sourceCategories.has(category)) {
             sourceCategories.delete(category);
             this.showUrlMessage('Removed from favorites');
+            // isNowFavorite = false; // This variable was declared but its value never read.
+
+            if (this.showFavorites) {
+                const categoryIdToRemove = category;
+                const mediaSourceIdToRemove = mediaSource;
+
+                this.items = this.items.filter(item =>
+                    !(item.category_id === categoryIdToRemove && item.media_source === mediaSourceIdToRemove)
+                );
+
+                if (this.items.length === 0) { // Current favorites view is empty
+                    // Check if *any* favorites remain in the this.favorites map across all sources
+                    let noFavoritesLeftAtAll = true;
+                    this.favorites.forEach(set => {
+                        if (set.size > 0) {
+                            noFavoritesLeftAtAll = false;
+                        }
+                    });
+
+                    if (noFavoritesLeftAtAll) {
+                        // All favorites are gone from the system. Redirect to a non-custom source.
+                        this.showFavorites = false;
+                        this.showLikedImages = false; // Ensure this is also off
+
+                        const firstNonCustomSource = this.mediaSources.find(s => s.id !== BIJUKARU_CUSTOM_SOURCE_ID);
+                        if (firstNonCustomSource) {
+                            this.selectedMediaSource = firstNonCustomSource.id;
+                            this.selectedCategory = ""; // Will be set by loadCategories to the first of the new source
+                            this.previousSelectedMediaSource = null; // Clear previous state
+                            this.previousSelectedCategory = null;
+
+                            // Asynchronously load categories and then the content for the new source/category.
+                            (async () => {
+                                await this.loadCategories();
+                                await this.loadCategory();
+                            })();
+                        } else {
+                            // Highly unlikely fallback: No non-custom sources exist.
+                            this.items = [];
+                            this.error = "No media sources available to display.";
+                            this.loading = false;
+                            this.updateURL();
+                            this.updateDocumentTitle();
+                            this.stopAutoSlide();
+                        }
+                        return; // Exit toggleFavorite as we've handled the redirection
+                    } else {
+                        // Favorites still exist elsewhere in the system, but this specific view became empty.
+                        this.toggleShowFavorites(); // This will handle restoring previous state or defaulting.
+                        return; // Exit toggleFavorite
+                    }
+                } else {
+                    // Items still remain in the current favorites view, just update the current item.
+                    this.currentIndex = Math.max(0, Math.min(this.currentIndex, this.items.length - 1));
+                    this.updateDocumentTitle();
+                    this.updateURL();
+                    this.stopAutoSlide();
+                    this.startAutoSlide();
+                }
+            }
         } else {
             sourceCategories.add(category);
             this.showUrlMessage('Added to favorites');
+            // isNowFavorite = true; // This variable was declared but its value never read.
         }
 
-        // Create a new map to ensure reactivity in Svelte 5
         this.favorites = new Map(this.favorites);
-
-        // Save to localStorage
         this.saveFavorites();
     }
 
-    isFavorite = (categoryId?: string) => {
-        const category = categoryId || this.selectedCategory;
-        const mediaSource = this.selectedMediaSource;
+    isFavorite = (categoryIdInput?: string, mediaSourceIdInput?: string) => {
+        const mediaSource = mediaSourceIdInput || (this.showFavorites && this.currentItem?.media_source) || this.selectedMediaSource;
+        const category = categoryIdInput || (this.showFavorites && this.currentItem?.category_id) || this.selectedCategory;
 
         if (!category || !mediaSource) return false;
 
@@ -1679,30 +1939,45 @@ export class GalleryStateClass implements GalleryState {
             let allItems: ImageItem[] = [];
 
             // For each media source with favorites
-            for (const mediaSource of mediaSourcesWithFavorites) {
-                const favoriteCategories = Array.from(this.favorites.get(mediaSource)!);
+            for (const mediaSourceId of mediaSourcesWithFavorites) { // mediaSourceId is the ID
+                let categoriesForCurrentSource: Category[] = [];
+                try {
+                    const catResponse = await fetch(`/api/${mediaSourceId}/categories`);
+                    if (catResponse.ok) {
+                        categoriesForCurrentSource = await catResponse.json();
+                    } else {
+                        console.warn(`Could not fetch categories for source ${mediaSourceId} during favorite loading. Status: ${catResponse.status}`);
+                    }
+                } catch (e) {
+                    console.warn(`Error fetching categories for source ${mediaSourceId} in loadAllFavorites:`, e);
+                }
+
+                const favoriteCategories = Array.from(this.favorites.get(mediaSourceId)!);
 
                 // For each favorite category in this media source
-                for (const category of favoriteCategories) {
-                    const endpoint = `/api/${mediaSource}/feed?category=${category}${this.isHD ? '&hd=true' : ''}`;
+                for (const categoryId of favoriteCategories) { // categoryId is the ID
+                    const endpoint = `/api/${mediaSourceId}/feed?category=${categoryId}${this.isHD ? '&hd=true' : ''}`;
                     const response = await fetch(endpoint);
 
                     if (!response.ok) {
-                        console.warn(`Failed to load favorites from ${mediaSource}/${category}: ${response.statusText}`);
+                        console.warn(`Failed to load favorites from ${mediaSourceId}/${categoryId}: ${response.statusText}`);
                         continue; // Skip this category but continue with others
                     }
 
                     const data = await response.json();
                     if (data.items && Array.isArray(data.items)) {
                         // Add properties to track source and category
-                        const sourceName = this.mediaSources.find(s => s.id === mediaSource)?.name || mediaSource;
-                        const categoryName = this.categories.find(c => c.id === category)?.name || category;
-                        const itemsWithSource = data.items.map((item: ImageItem) => ({
+                        const resolvedSourceName = this.mediaSources.find(s => s.id === mediaSourceId)?.name || mediaSourceId;
+                        // Use categoriesForCurrentSource to find the name
+                        const resolvedCategoryName = categoriesForCurrentSource.find(c => c.id === categoryId)?.name || categoryId;
+                        const itemsWithSourceInfo = data.items.map((item: ImageItem) => ({
                             ...item,
-                            sourceCategory: `${sourceName} - ${categoryName}`
+                            sourceCategory: `${resolvedSourceName} - ${resolvedCategoryName}`, // For display
+                            media_source: mediaSourceId, // Store the actual media source ID
+                            category_id: categoryId      // Store the actual category ID
                         }));
 
-                        allItems = [...allItems, ...itemsWithSource];
+                        allItems = [...allItems, ...itemsWithSourceInfo];
                     }
                 }
             }
@@ -1718,7 +1993,6 @@ export class GalleryStateClass implements GalleryState {
             // Update URL to reflect we're viewing all favorites
             const url = new URL(window.location.href);
             url.searchParams.set('favorites', 'true');
-            url.searchParams.set('all_sources', 'true');
             pushState(url.toString(), {});
 
             // Start auto slide if not paused
@@ -1738,21 +2012,33 @@ export class GalleryStateClass implements GalleryState {
     }
 
     toggleShowFavorites = () => {
-        if (this.showFavorites) {
-            // If we're already showing favorites, go back to regular view
-            this.showFavorites = false;
-            this.loadCategory();
-        } else {
-            // Check if we should show all favorites or just current source
-            const urlParams = new URLSearchParams(window.location.search);
-            const showAllSources = urlParams.get('all_sources') === 'true';
+        const activating = !this.showFavorites;
+        this.showFavorites = activating;
+        this.showLikedImages = false; // Can't show both
 
-            if (showAllSources) {
-                this.loadAllFavorites();
-            } else {
-                this.loadFavoritesCategory();
+        if (activating) {
+            // Store previous state if not already in a custom view
+            if (this.selectedMediaSource !== BIJUKARU_CUSTOM_SOURCE_ID) {
+                this.previousSelectedMediaSource = this.selectedMediaSource;
+                this.previousSelectedCategory = this.selectedCategory;
             }
+            this.selectedMediaSource = BIJUKARU_CUSTOM_SOURCE_ID;
+            // Set categories and selected category for the dropdown
+            this.categories = [{ id: FAVORITES_CATEGORY_ID, name: 'Favorites' }];
+            this.selectedCategory = FAVORITES_CATEGORY_ID;
+            this.category = this.categories[0]; // Update internal category reference
+            this.categoryIndex = 0;
+            // Load items from all favorited categories across all sources
+            this.loadAllFavorites();
+        } else {
+            // Restore previous state
+            this.selectedMediaSource = this.previousSelectedMediaSource || this.mediaSources.find(s => s.id !== BIJUKARU_CUSTOM_SOURCE_ID)?.id || this.mediaSources[0]?.id || '';
+            this.selectedCategory = this.previousSelectedCategory || '';
+            this.previousSelectedMediaSource = null;
+            this.previousSelectedCategory = null;
+            this.loadCategory(); // Reload original category/source
         }
+        this.updateURL();
     }
 
     loadLikedImages = () => {
@@ -1829,7 +2115,8 @@ export class GalleryStateClass implements GalleryState {
             }
 
             // Use the stored liked images directly
-            this.items = this.shuffleArray([...this.likedImages]);
+            // this.items = this.shuffleArray([...this.likedImages]);
+            this.items = [...this.likedImages];
             this.currentIndex = 0;
 
             // Update URL to reflect we're viewing liked images
@@ -1854,12 +2141,109 @@ export class GalleryStateClass implements GalleryState {
     }
 
     toggleShowLikedImages = () => {
-        if (this.showLikedImages) {
-            // If we're already showing liked images, go back to regular view
-            this.showLikedImages = false;
-            this.loadCategory();
+        const activating = !this.showLikedImages;
+        this.showLikedImages = activating;
+        this.showFavorites = false; // Can't show both
+
+        if (activating) {
+            // Store previous state if not already in a custom view
+            if (this.selectedMediaSource !== BIJUKARU_CUSTOM_SOURCE_ID) {
+                this.previousSelectedMediaSource = this.selectedMediaSource;
+                this.previousSelectedCategory = this.selectedCategory;
+            }
+            this.selectedMediaSource = BIJUKARU_CUSTOM_SOURCE_ID;
+            // Set categories and selected category for the dropdown
+            this.categories = [{ id: LIKED_CATEGORY_ID, name: 'Liked Images' }];
+            this.selectedCategory = LIKED_CATEGORY_ID;
+            this.category = this.categories[0]; // Update internal category reference
+            this.categoryIndex = 0;
+            this.loadLikedImagesView(); // Load the liked items
         } else {
-            this.loadLikedImagesView();
+            // Restore previous state
+            this.selectedMediaSource = this.previousSelectedMediaSource || this.mediaSources.find(s => s.id !== BIJUKARU_CUSTOM_SOURCE_ID)?.id || this.mediaSources[0]?.id || '';
+            this.selectedCategory = this.previousSelectedCategory || '';
+            this.previousSelectedMediaSource = null;
+            this.previousSelectedCategory = null;
+            this.loadCategory(); // Reload original category/source
+        }
+        this.updateURL();
+    }
+
+    updateProgressBar = () => {
+        // Since animateProgressBar handles reset and animation, just call it.
+        this.animateProgressBar();
+    }
+
+    loadArchivedCuratedFeeds = () => {
+        try {
+            const data = localStorage.getItem('galleryArchivedCuratedFeeds');
+            if (data) {
+                this.archivedCuratedFeeds = JSON.parse(data);
+            }
+        } catch (error) {
+            console.error('Error loading archived curated feeds:', error);
+            this.archivedCuratedFeeds = [];
+        }
+    }
+
+    saveArchivedCuratedFeeds = () => {
+        try {
+            localStorage.setItem('galleryArchivedCuratedFeeds', JSON.stringify(this.archivedCuratedFeeds));
+        } catch (error) {
+            console.error('Error saving archived curatedFeeds:', error);
+        }
+    }
+
+    // Internal method to load a specific archived curated feed from stored data
+    _loadSpecificCuratedFeed = (feed: ArchivedCuratedFeed) => {
+        console.log(`Loading archived curated feed: ${feed.name} from stored items.`);
+        this.loading = true;
+        this.error = null;
+        this.items = []; // Clear current items
+        this.showFavorites = false; // Ensure these are off
+        this.showLikedImages = false;
+
+        try {
+            if (feed.items && feed.id && feed.name) {
+                this.items = [...feed.items]; // Use a copy of the stored items
+                this.category = { id: feed.id, name: feed.name };
+                this.selectedCategory = this.category.id; // Ensure selectedCategory matches the loaded feed ID
+                this.currentIndex = 0;
+
+                if (this.items.length === 0) {
+                    this.error = 'Archived curated feed is empty.';
+                } else {
+                    this.error = null;
+                }
+
+                // Ensure the categories dropdown still reflects the custom source options + this loaded one
+                const customCategories: Category[] = [
+                    { id: FAVORITES_CATEGORY_ID, name: 'Favorites' },
+                    { id: LIKED_CATEGORY_ID, name: 'Liked Images' },
+                    ...this.archivedCuratedFeeds.map(f => ({ id: f.id, name: f.name }))
+                ];
+                this.categories = customCategories;
+                this.categoryIndex = Math.max(0, this.categories.findIndex(c => c.id === this.selectedCategory));
+
+                this.updateProgressBar();
+                this.updateURL();
+                this.updateDocumentTitle();
+                this.prefetchNextImages();
+                this.startAutoSlide();
+
+                // Display user-friendly message if it exists
+                if (feed.userfriendly_message) {
+                    this.showUrlMessage(feed.userfriendly_message);
+                }
+            } else {
+                throw new Error("Invalid archived curated feed data.");
+            }
+        } catch (err: any) {
+            console.error('Error loading archived curated feed:', err);
+            this.error = err.message || 'An error occurred while loading the archived curated feed.';
+            this.items = []; // Clear items on error
+        } finally {
+            this.loading = false;
         }
     }
 }

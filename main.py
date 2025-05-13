@@ -18,8 +18,12 @@ from reddit import get_reddit_feed, get_reddit_categories
 from wikiart import get_popular_artists, get_wikiart_feed, get_wikiart_categories
 from dotenv import load_dotenv
 
-# Import for structured search
-from llm_research import get_structured_params
+# Import for structured search and curation
+from llm_research import (
+    get_structured_params,
+    generate_curated_feed_multi_agent,
+    CuratedFeed,
+)
 from models import BijukaruUrlParams
 
 from schema import Category, Feed
@@ -243,7 +247,43 @@ async def search_gallery(query: str, token: Optional[str] = None) -> JSONRespons
         # You might want to return a more specific error message
         # based on why structured_params is None or has no URL.
         return JSONResponse(
-            content={"error": "Could not interpret the search query."}, status_code=400
+            content={"error": "Could not interpret the search query."},
+            status_code=400,
+        )
+
+
+@app.get("/api/curate", response_model=Optional[CuratedFeed])
+@cache(expire=60 * 60 * 1)  # Cache for 1 hour
+async def curate_gallery(query: str, token: Optional[str] = None) -> JSONResponse:
+    """
+    Parses a natural language query to generate a curated feed with narrative.
+    Requires a valid token for access.
+    """
+    # Verify token first
+    search_token = os.getenv("SEARCH_TOKEN")
+    if search_token is None:
+        return JSONResponse(
+            content={"error": "Server configuration error"}, status_code=500
+        )
+
+    if not token or not hmac.compare_digest(token, search_token):
+        return JSONResponse(
+            content={"error": "Unauthorized. Valid token required for curation."},
+            status_code=401,
+        )
+
+    curated_feed: Optional[CuratedFeed] = await generate_curated_feed_multi_agent(query)
+    if curated_feed:
+        # Add cache control headers
+        response = JSONResponse(
+            content=curated_feed.model_dump(),
+            headers={"Cache-Control": "public, max-age=3600"},  # Cache for 1 hour
+        )
+        return response
+    else:
+        return JSONResponse(
+            content={"error": "Could not generate curated feed for the query."},
+            status_code=400,
         )
 
 

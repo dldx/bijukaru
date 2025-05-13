@@ -175,14 +175,14 @@
                     <input type="text"
                            bind:value={galleryState.searchQuery}
                            onkeydown={(e) => e.key === 'Enter' && galleryState.performSearch()}
-                           placeholder="e.g., Van Gogh starry night, APOD today, Reddit cats..."
+                           placeholder="e.g., Van Gogh starry night, story of..."
                            autofocus
                            class="bg-white/90 dark:bg-gray-200/90 px-4 py-2 border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900">
 
                         <button onclick={() => galleryState.performSearch()}
                                 class="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-md text-white transition-colors cursor-pointer"
-                                title="Search"
-                                aria-label="Search gallery"
+                                title="Search or Curate"
+                                aria-label="Search or Curate gallery"
                                 >
                             <span class:hidden={galleryState.loading}>✨</span>
                             <span class:hidden={!galleryState.loading}>Searching...</span>
@@ -389,18 +389,35 @@
                                 </svg>
                             </button>
                         {/if}
-                        <div class:hidden={!galleryState.selectedCategory}
+                        <div
+                        class:hidden={!galleryState.selectedCategory}
                             class:mobile-truncate={galleryState.selectedMediaSource !== 'wikiart'}
                         class="flex items-center bg-black/50 ml-3 px-3 py-1 rounded-full text-sm">
-                        <span>{galleryState.getCurrentCategoryName()}</span>
+                        <span>{galleryState.currentCategoryName}</span>
                         <!-- Favorite Star Icon -->
                         <button
-                            onclick={(e) => { e.stopPropagation(); galleryState.toggleFavorite(); }}
+                            aria-label="Toggle favorites"
+                            onclick={(e) => {
+                                e.stopPropagation();
+                                if (galleryState.showFavorites && galleryState.currentItem) {
+                                    galleryState.toggleFavorite(galleryState.currentItem.category_id, galleryState.currentItem.media_source);
+                                } else {
+                                    galleryState.toggleFavorite();
+                                }
+                            }}
                             class="ml-2 focus:outline-none"
-                            title={galleryState.isFavorite() ? "Remove from favorites" : "Add to favorites"}>
+                            title={
+                                galleryState.showFavorites && galleryState.currentItem ?
+                                (galleryState.isFavorite(galleryState.currentItem.category_id, galleryState.currentItem.media_source) ? "Remove from favorites" : "Add to favorites") :
+                                (galleryState.isFavorite() ? "Remove from favorites" : "Add to favorites")
+                            }>
                             <svg xmlns="http://www.w3.org/2000/svg"
                                 class="w-5 h-5"
-                                fill={galleryState.isFavorite() ? "currentColor" : "none"}
+                                fill={
+                                    galleryState.showFavorites && galleryState.currentItem ?
+                                    (galleryState.isFavorite(galleryState.currentItem.category_id, galleryState.currentItem.media_source) ? "currentColor" : "none") :
+                                    (galleryState.isFavorite() ? "currentColor" : "none")
+                                }
                                 viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round"
@@ -413,7 +430,7 @@
                     </div>
 
                     <!-- Favorites view indicator -->
-                    {#if galleryState.showFavorites}
+                    <!-- {#if galleryState.showFavorites}
                         <div class="favorites-indicator">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
@@ -429,7 +446,7 @@
                                 {/if}
                             </span>
                         </div>
-                    {/if}
+                    {/if} -->
 
                     <!-- Description overlay -->
                     {#if galleryState.showDescription && galleryState.currentItem?.description}
@@ -651,7 +668,7 @@
                     </div>
 
                     <!-- Liked Images View Indicator -->
-                    {#if galleryState.showLikedImages}
+                    <!-- {#if galleryState.showLikedImages}
                         <div class="liked-images-indicator">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -663,7 +680,7 @@
                                 {/if}
                             </span>
                         </div>
-                    {/if}
+                    {/if} -->
                 </div>
             </div>
 

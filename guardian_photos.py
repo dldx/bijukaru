@@ -2,33 +2,47 @@ from bs4 import BeautifulSoup
 import requests
 from schema import FeedItem, Category, Feed
 from functools import lru_cache
-from typing import Any
+from typing import Any, Optional
 from datetime import datetime
+import dateparser
 
 class GuardianCategory(Category):
+    date: Optional[datetime] = None
     def model_post_init(self, context: Any) -> None:
         self.link = f"https://www.theguardian.com/{self.id}"
 
 
 def get_guardian_categories() -> list[GuardianCategory]:
-    url = "https://www.theguardian.com/news/series/ten-best-photographs-of-the-day/rss"
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, "html.parser")
+    rss_urls = [
+        "https://www.theguardian.com/news/series/ten-best-photographs-of-the-day/rss",
+        "https://www.theguardian.com/artanddesign/artanddesign+content/gallery/rss",
+    ]
     categories = []
-    for item in soup.find_all("item"):
-        categories.append(
-            GuardianCategory(
-                id=item.find("guid")
+    for url in rss_urls:
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, "html.parser")
+        for item in soup.find_all("item"):
+            if (item.find("guid") is not None) and (
+                id := item.find("guid")
                 .text.strip()
                 .removeprefix("https://www.theguardian.com/")
-                .replace("/", "__"),
-                name=item.find("title").text.strip(),
-            )
-        )
+                .replace("/", "__")
+            ) not in [c.id for c in categories]:
+                date = dateparser.parse(item.find("dc:date").text.strip())
+                categories.append(
+                    GuardianCategory(
+                        id=id,
+                        name=item.find("title").text.strip(),
+                        date=date,
+                    )
+                )
+    # Sort categories by date
+    categories.sort(key=lambda x: x.date, reverse=True)
     categories += [
         GuardianCategory(
             id="artanddesign__gallery__2022__feb__17__ansel-adams-rare-photographs-in-stunning-hi-definition",
             name="Ansel Adams: rare photographs in stunning hi-definition",
+            date=datetime(2022, 2, 17),
         )
     ]
     return categories
@@ -50,7 +64,6 @@ def get_guardian_photos_feed(category: str) -> Feed:
         try:
             images.append(sorted([img.get("srcset").split(" ") for img in image_container.find_all("source")], key=lambda x: int(x[1].removesuffix("w")))[-1][0])
         except IndexError:
-            breakpoint()
             images.append(image_container.find("img").get("src"))
         titles.append(image_container.find("img").get("alt"))
         links.append(image_container.find("a").get("href"))
