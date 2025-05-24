@@ -1,12 +1,10 @@
 import random
+from urllib.parse import parse_qs, urlencode
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-import httpx
-import xml.etree.ElementTree as ET
-from bs4 import BeautifulSoup
+from fastapi.staticfiles import StaticFiles
 from typing import List, Literal, Optional
-from datetime import datetime
 import hmac
 import os
 from fastapi_cache import FastAPICache
@@ -20,8 +18,12 @@ from reddit import get_reddit_feed, get_reddit_categories
 from wikiart import get_popular_artists, get_wikiart_feed, get_wikiart_categories
 from dotenv import load_dotenv
 
-# Import for structured search
-from llm_research import get_structured_params
+# Import for structured search and curation
+from llm_research import (
+    get_structured_params,
+    generate_curated_feed_multi_agent,
+    CuratedFeed,
+)
 from models import BijukaruUrlParams
 
 from schema import Category, Feed
@@ -45,6 +47,12 @@ if os.getenv("SEARCH_TOKEN") is None:
 
 # Set up templates
 templates = Jinja2Templates(directory="templates")
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Mount Svelte SPA static files
+app.mount("/_app", StaticFiles(directory="static/spa/_app"), name="spa-assets")
 
 media_sources = {
     "apod": {
@@ -80,15 +88,10 @@ media_sources = {
 }
 
 
-@app.get("/{media_source}", response_class=HTMLResponse)
 @app.get("/", response_class=HTMLResponse)
-async def read_root(
-    request: Request,
-    media_source: Literal[
-        "thisiscolossal", "apod", "ukiyo-e", "guardian", "reddit", "wikiart"
-    ] = "thisiscolossal",
-):
-    return templates.TemplateResponse("index.html", {"request": request, "media_source": media_source, **media_sources[media_source]})
+async def serve_root(request: Request):
+    # Serve the Svelte SPA for the root route
+    return FileResponse("static/spa/index.html")
 
 
 @app.get("/api/thisiscolossal/categories", response_model=List[Category])
@@ -165,10 +168,13 @@ async def _get_wikiart_categories():
 
 @app.get("/api/wikiart/feed")
 async def _get_wikiart_feed(
-    category: str = get_wikiart_categories()[0].id, hd: bool = False
+    request: Request, category: str = get_wikiart_categories()[0].id, hd: bool = False
 ):
     if category == "random-artist":
         _category = "artist:" + random.choice(get_popular_artists())
+        return RedirectResponse(
+            f"{app.url_path_for('_get_wikiart_feed')}/?category={_category}&hd={hd}"
+        )
     else:
         _category = category
     # Send cache control headers
@@ -191,7 +197,14 @@ async def verify_token(token: str) -> JSONResponse:
     Uses constant time comparison to prevent timing attacks.
     """
     # Use constant time comparison to prevent timing attacks
-    is_correct = hmac.compare_digest(token, os.getenv("SEARCH_TOKEN"))
+    search_token = os.getenv("SEARCH_TOKEN")
+    if search_token is None:
+        return JSONResponse(
+            content={"authorized": False, "error": "Server configuration error"},
+            status_code=500,
+        )
+
+    is_correct = hmac.compare_digest(token, search_token)
 
     if is_correct:
         return JSONResponse(content={"authorized": True, "message": "Token accepted"})
@@ -210,7 +223,13 @@ async def search_gallery(query: str, token: Optional[str] = None) -> JSONRespons
     Requires a valid token for access.
     """
     # Verify token first
-    if not token or not hmac.compare_digest(token, os.getenv("SEARCH_TOKEN")):
+    search_token = os.getenv("SEARCH_TOKEN")
+    if search_token is None:
+        return JSONResponse(
+            content={"error": "Server configuration error"}, status_code=500
+        )
+
+    if not token or not hmac.compare_digest(token, search_token):
         return JSONResponse(
             content={"error": "Unauthorized. Valid token required for search."},
             status_code=401,
@@ -228,7 +247,43 @@ async def search_gallery(query: str, token: Optional[str] = None) -> JSONRespons
         # You might want to return a more specific error message
         # based on why structured_params is None or has no URL.
         return JSONResponse(
-            content={"error": "Could not interpret the search query."}, status_code=400
+            content={"error": "Could not interpret the search query."},
+            status_code=400,
+        )
+
+
+@app.get("/api/curate", response_model=Optional[CuratedFeed])
+@cache(expire=60 * 60 * 1)  # Cache for 1 hour
+async def curate_gallery(query: str, token: Optional[str] = None) -> JSONResponse:
+    """
+    Parses a natural language query to generate a curated feed with narrative.
+    Requires a valid token for access.
+    """
+    # Verify token first
+    search_token = os.getenv("SEARCH_TOKEN")
+    if search_token is None:
+        return JSONResponse(
+            content={"error": "Server configuration error"}, status_code=500
+        )
+
+    if not token or not hmac.compare_digest(token, search_token):
+        return JSONResponse(
+            content={"error": "Unauthorized. Valid token required for curation."},
+            status_code=401,
+        )
+
+    curated_feed: Optional[CuratedFeed] = await generate_curated_feed_multi_agent(query)
+    if curated_feed:
+        # Add cache control headers
+        response = JSONResponse(
+            content=curated_feed.model_dump(),
+            headers={"Cache-Control": "public, max-age=3600"},  # Cache for 1 hour
+        )
+        return response
+    else:
+        return JSONResponse(
+            content={"error": "Could not generate curated feed for the query."},
+            status_code=400,
         )
 
 
@@ -247,3 +302,20 @@ async def get_media_sources():
             }
         )
     return sources
+
+
+# This must be last to avoid capturing API routes
+@app.get("/{path}", response_class=HTMLResponse)
+async def serve_spa(
+    request: Request,
+    path: Literal["apod", "thisiscolossal", "guardian", "reddit", "ukiyo-e", "wikiart"],
+):
+    # All non-API routes should be handled by the SPA
+    # This includes media source routes like /guardian, /thisiscolossal, etc.
+    query_params = request.query_params.items()
+    # Remove the source parameter
+    query_params = [param for param in query_params if param[0] != "media_source"]
+    # Redirect to the new URL with the source parameter
+    return RedirectResponse(
+        f"/?media_source={path}&{urlencode(query_params)}", status_code=302
+    )

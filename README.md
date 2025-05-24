@@ -2,6 +2,12 @@
 
 This is a carousel gallery for art images, supporting multiple media sources including [This is Colossal](https://www.thisiscolossal.com), [Astronomy Picture of the Day](https://apod.nasa.gov/apod/astropix.html), [Ukiyo-e.org](https://ukiyo-e.org), and [WikiArt](https://www.wikiart.org). It's suitable for embedding on other websites or in [Obsidian](https://obsidian.md).
 
+## Architecture
+
+Bijukaru consists of two main components:
+- **Backend**: A FastAPI application that provides API endpoints for different media sources
+- **Frontend**: A Svelte single-page application (SPA) that provides the user interface
+
 ## Features
 
 - **Multiple Media Sources**: Switch between different content providers (This is Colossal, Astronomy Picture of the Day, Ukiyo-e.org, Guardian, Reddit, WikiArt)
@@ -149,3 +155,67 @@ frame: Bijukaru
 url: https://frames.dldx.org?token=yoursecrettoken
 style: background-color: unset; height: 800px;```
 ```
+
+## Development
+
+### Prerequisites
+
+- Python 3.7+ for the FastAPI backend
+- Node.js 16+ for the Svelte frontend
+- [Bun](https://bun.sh/) (recommended) or npm for frontend package management
+
+### Setup
+
+1. Clone the repository and navigate to the project directory:
+   ```bash
+   git clone https://github.com/yourusername/bijukaru.git
+   cd bijukaru
+   ```
+
+2. Create a Python virtual environment and install dependencies:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows, use `.venv\Scripts\activate`
+   pip install -r requirements.txt
+   ```
+
+3. Set up the frontend:
+   ```bash
+   cd frontend
+   bun install  # or npm install
+   ```
+
+4. Create a `.env` file in the root directory with required variables:
+   ```
+   SEARCH_TOKEN=your_secret_token_here
+   ```
+
+### Running for Development
+
+1. Start the FastAPI backend (from the root directory):
+   ```bash
+   python -m uvicorn main:app --reload
+   ```
+
+2. In a separate terminal, start the Svelte dev server:
+   ```bash
+   cd frontend
+   bun run dev  # or npm run dev
+   ```
+
+3. Open your browser and navigate to http://localhost:5173
+
+### Building for Production
+
+1. Build the Svelte frontend:
+   ```bash
+   cd frontend
+   bun run build:fastapi  # or npm run build:fastapi
+   ```
+
+2. Start the FastAPI server:
+   ```bash
+   python -m uvicorn main:app
+   ```
+
+The FastAPI server will serve both the API endpoints and the static Svelte SPA.
