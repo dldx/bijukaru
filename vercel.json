@@ -1,4 +1,6 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd frontend && bun install && bun run build:fastapi",
   "builds": [
     {
       "src": "main.py",
