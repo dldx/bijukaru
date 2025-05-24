@@ -1183,6 +1183,8 @@ export class GalleryStateClass implements GalleryState {
             // Still process Escape to close search overlay
             if (e.key === 'Escape' && this.showSearchOverlay) {
                 this.closeSearchOverlay();
+                e.preventDefault(); // Prevent default behavior
+                e.stopPropagation(); // Stop event propagation
             }
             return;
         }
@@ -1190,6 +1192,8 @@ export class GalleryStateClass implements GalleryState {
         // If help screen is visible, Escape should close it
         if (this.showHelp && e.key === 'Escape') {
             this.showHelp = false;
+            e.preventDefault();
+            e.stopPropagation();
             return;
         }
 
@@ -1852,18 +1856,22 @@ export class GalleryStateClass implements GalleryState {
     loadFavoritesCategory = async () => {
         // Store if we're showing favorites before potentially clearing it
         const wasShowingFavorites = this.showFavorites;
-        this.showFavorites = true;
 
         this.loading = true;
         this.error = null;
-        this.items = [];
 
         try {
             // Get all favorite categories for the current media source
             const mediaSource = this.selectedMediaSource;
             if (!this.favorites.has(mediaSource) || this.favorites.get(mediaSource)!.size === 0) {
-                throw new Error('No favorites for this media source');
+                // Show message without switching to favorites view
+                this.showUrlMessage('No favourite categories found. Add categories to your favorites by pressing "s" key or the star icon.');
+                return;
             }
+
+            // Only set showFavorites to true if we have favorites to show
+            this.showFavorites = true;
+            this.items = [];
 
             const favoriteCategories = Array.from(this.favorites.get(mediaSource)!);
 
@@ -1892,7 +1900,19 @@ export class GalleryStateClass implements GalleryState {
             }
 
             if (allItems.length === 0) {
-                throw new Error('No items found in your favorites');
+                // Show message without keeping favorites view
+                this.showUrlMessage('No favourite categories found. Add categories to your favorites by pressing "s" key or the star icon.');
+                this.showFavorites = wasShowingFavorites; // Restore previous state
+
+                // If we weren't already in favorites view, return to previous view
+                if (!wasShowingFavorites && this.previousSelectedMediaSource) {
+                    this.selectedMediaSource = this.previousSelectedMediaSource;
+                    this.selectedCategory = this.previousSelectedCategory || '';
+                    this.previousSelectedMediaSource = null;
+                    this.previousSelectedCategory = null;
+                    await this.loadCategory();
+                }
+                return;
             }
 
             // Shuffle items to mix categories
@@ -1923,18 +1943,22 @@ export class GalleryStateClass implements GalleryState {
     loadAllFavorites = async () => {
         // Store if we're showing favorites before potentially clearing it
         const wasShowingFavorites = this.showFavorites;
-        this.showFavorites = true;
 
         this.loading = true;
         this.error = null;
-        this.items = [];
 
         try {
             // Get all media sources that have favorites
             const mediaSourcesWithFavorites = Array.from(this.favorites.keys());
             if (mediaSourcesWithFavorites.length === 0) {
-                throw new Error('No favorites found across any media sources');
+                // Show message without switching to favorites view
+                this.showUrlMessage('No favourite categories found. Add categories to your favorites by pressing "s" key or the star icon.');
+                return;
             }
+
+            // Only set showFavorites to true if we have favorites to show
+            this.showFavorites = true;
+            this.items = [];
 
             let allItems: ImageItem[] = [];
 
@@ -1983,7 +2007,10 @@ export class GalleryStateClass implements GalleryState {
             }
 
             if (allItems.length === 0) {
-                throw new Error('No items found in your favorites');
+                // Show message without keeping favorites view
+                this.showUrlMessage('No favourite categories found. Add categories to your favorites by pressing "s" key or the star icon.');
+                this.showFavorites = wasShowingFavorites; // Restore previous state
+                return;
             }
 
             // Shuffle items to mix sources and categories
@@ -2013,15 +2040,26 @@ export class GalleryStateClass implements GalleryState {
 
     toggleShowFavorites = () => {
         const activating = !this.showFavorites;
-        this.showFavorites = activating;
-        this.showLikedImages = false; // Can't show both
 
         if (activating) {
+            // Check if there are any favorites before activating
+            const hasAnyFavorites = this.favorites.size > 0 && Array.from(this.favorites.values()).some(set => set.size > 0);
+
+            if (!hasAnyFavorites) {
+                // Show message without switching to favorites view
+                this.showUrlMessage('No favourite categories found. Add categories to your favorites by pressing "s" key or the star icon.');
+                return;
+            }
+
             // Store previous state if not already in a custom view
             if (this.selectedMediaSource !== BIJUKARU_CUSTOM_SOURCE_ID) {
                 this.previousSelectedMediaSource = this.selectedMediaSource;
                 this.previousSelectedCategory = this.selectedCategory;
             }
+
+            this.showFavorites = true;
+            this.showLikedImages = false; // Can't show both
+
             this.selectedMediaSource = BIJUKARU_CUSTOM_SOURCE_ID;
             // Set categories and selected category for the dropdown
             this.categories = [{ id: FAVORITES_CATEGORY_ID, name: 'Favorites' }];
@@ -2031,6 +2069,7 @@ export class GalleryStateClass implements GalleryState {
             // Load items from all favorited categories across all sources
             this.loadAllFavorites();
         } else {
+            this.showFavorites = false;
             // Restore previous state
             this.selectedMediaSource = this.previousSelectedMediaSource || this.mediaSources.find(s => s.id !== BIJUKARU_CUSTOM_SOURCE_ID)?.id || this.mediaSources[0]?.id || '';
             this.selectedCategory = this.previousSelectedCategory || '';

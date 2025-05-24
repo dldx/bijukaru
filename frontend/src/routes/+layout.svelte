@@ -127,17 +127,29 @@
 
     <!-- Search Overlay -->
     {#if galleryState.showSearchOverlay}
-        <div class="z-[100] fixed inset-0 flex justify-center items-center bg-black/85 backdrop-blur-sm p-4"
+        <div class="z-[100] fixed inset-0 flex justify-center items-center bg-black/65 backdrop-blur-sm p-4"
         onclick={() => galleryState.closeSearchOverlay()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="search-dialog-title"
         tabindex="0"
-        onkeydown={(e) => e.key === 'Escape' && galleryState.closeSearchOverlay()}
+        onkeydown={(e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                galleryState.closeSearchOverlay();
+            }
+        }}
         >
             <div class="relative bg-gray-900 dark:bg-dark-surface shadow-xl p-6 rounded-lg w-full max-w-md"
             onclick={(e) => e.stopPropagation()}
-            onkeydown={(e) => e.key === 'Escape' && galleryState.closeSearchOverlay()}
+            onkeydown={(e) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    galleryState.closeSearchOverlay();
+                }
+            }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="search-dialog-title"
@@ -148,12 +160,24 @@
                 <!-- Token input (shown when not authorized) -->
                 {#if !galleryState.isSearchAuthorized}
                     <div class="mb-4">
-                        <form onsubmit={() => galleryState.verifyToken()}>
+                        <form onsubmit={(e) => {
+                            e.preventDefault();
+                            galleryState.verifyToken();
+                        }}>
                         <label class="block mb-2 text-gray-300 text-sm" for="searchToken">Enter token to access search:</label>
                         <input type="text"
                                id="searchToken"
                                bind:value={galleryState.searchToken}
-                               onkeydown={(e) => e.key === 'Enter' && galleryState.verifyToken()}
+                               onkeydown={(e) => {
+                                   if (e.key === 'Enter') {
+                                       e.preventDefault();
+                                       galleryState.verifyToken();
+                                   } else if (e.key === 'Escape') {
+                                       e.preventDefault();
+                                       e.stopPropagation();
+                                       galleryState.closeSearchOverlay();
+                                   }
+                               }}
                                placeholder="Enter token"
                                autofocus
                                class="bg-white/90 dark:bg-gray-200/90 px-4 py-2 border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900">
@@ -174,7 +198,16 @@
                     <div class="flex flex-row justify-center gap-4 mt-5">
                     <input type="text"
                            bind:value={galleryState.searchQuery}
-                           onkeydown={(e) => e.key === 'Enter' && galleryState.performSearch()}
+                           onkeydown={(e) => {
+                               if (e.key === 'Enter') {
+                                   e.preventDefault();
+                                   galleryState.performSearch();
+                               } else if (e.key === 'Escape') {
+                                   e.preventDefault();
+                                   e.stopPropagation();
+                                   galleryState.closeSearchOverlay();
+                               }
+                           }}
                            placeholder="e.g., Van Gogh starry night, story of..."
                            autofocus
                            class="bg-white/90 dark:bg-gray-200/90 px-4 py-2 border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900">
@@ -199,8 +232,9 @@
 
     <!-- Message overlay that will automatically disappear -->
     {#if galleryState.showMessageOverlay}
-        <div class="z-[110] fixed inset-0 flex justify-center items-center"
-             transition:fade={{duration: 300}}>
+        <div class="z-[110] fixed inset-0 flex justify-center items-center pointer-events-none"
+             transition:fade={{duration: 300}}
+             >
             <div class="bg-black/80 shadow-lg px-8 py-6 rounded-xl max-w-md text-white text-center">
                 <div class="text-lg">{galleryState.overlayMessage}</div>
             </div>

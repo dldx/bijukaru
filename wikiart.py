@@ -276,6 +276,7 @@ def search_wikiart(query: str) -> Feed:
 
     artworks = []
     for _query in queries:
+        _query = _query.strip()
         url = f"https://www.wikiart.org/en/Search/{urlquote(_query)}?json=2&layout=new&limit=100&resultType=masonry"
         response = requests.get(url)
         if response.status_code != 200:
