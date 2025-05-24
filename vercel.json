@@ -1,4 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd frontend && bun run build:fastapi"
+  "buildCommand": "uv sync && cd frontend && npm i bun && bun install && bun run build:fastapi"
 }
