@@ -5,6 +5,10 @@ from functools import lru_cache
 from typing import Any, Optional
 from datetime import datetime
 import dateparser
+import warnings
+from bs4 import XMLParsedAsHTMLWarning
+
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 class GuardianCategory(Category):
     date: Optional[datetime] = None
@@ -20,7 +24,7 @@ def get_guardian_categories() -> list[GuardianCategory]:
     categories = []
     for url in rss_urls:
         response = requests.get(url)
-        soup = BeautifulSoup(response.text, features="xml")
+        soup = BeautifulSoup(response.text, "lxml")
         for item in soup.find_all("item"):
             if (item.find("guid") is not None) and (
                 id := item.find("guid")

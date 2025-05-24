@@ -1,11 +1,11 @@
 {
   "builds": [
     {
-      "src": "package.json",
+      "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "buildCommand": "bun run build:fastapi",
-        "outputDirectory": "public"
+        "buildCommand": "cd frontend && bun run build:fastapi",
+        "outputDirectory": "static"
       }
     },
     {
