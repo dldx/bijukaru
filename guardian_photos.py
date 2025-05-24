@@ -20,7 +20,7 @@ def get_guardian_categories() -> list[GuardianCategory]:
     categories = []
     for url in rss_urls:
         response = requests.get(url)
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = BeautifulSoup(response.text, features="xml")
         for item in soup.find_all("item"):
             if (item.find("guid") is not None) and (
                 id := item.find("guid")

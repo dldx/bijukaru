@@ -1,11 +1,22 @@
 {
   "builds": [
     {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "buildCommand": "bun run build:fastapi",
+        "outputDirectory": "public"
+      }
+    },
+    {
       "src": "main.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
+    {
+      "handle": "filesystem"
+    },
     {
       "src": "/(.*)",
       "dest": "main.py"
