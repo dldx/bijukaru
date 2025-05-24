@@ -1,8 +1,13 @@
 {
-  "scripts": {
-    "build": "cd frontend && bun run build:fastapi"
-  },
   "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "buildCommand": "cd frontend && bun run build:fastapi",
+        "outputDirectory": "../static"
+      }
+    },
     {
       "src": "main.py",
       "use": "@vercel/python"
