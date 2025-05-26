@@ -88,8 +88,8 @@ interface GalleryState {
     currentItem?: ImageItem | null;
     currentSourceName: string;
     currentCategoryName: string;
-    favorites: Map<string, Set<string>>;
-    showFavorites: boolean;
+    favourites: Map<string, Set<string>>;
+    showFavourites: boolean;
     likedImages: ImageItem[];
     showLikedImages: boolean;
     // Add method signatures
@@ -131,13 +131,13 @@ interface GalleryState {
     changeMediaSource: (newSourceId?: string) => void;
     showTemporaryMediaSourceOverlay: () => void;
     shuffleArray: (array: any[]) => any[];
-    toggleFavorite: (categoryIdInput?: string, mediaSourceIdInput?: string) => void;
-    isFavorite: (categoryIdInput?: string, mediaSourceIdInput?: string) => boolean;
-    loadFavorites: () => void;
-    saveFavorites: () => void;
-    loadFavoritesCategory: () => Promise<void>;
-    toggleShowFavorites: () => void;
-    loadAllFavorites: () => Promise<void>;
+    toggleFavourite: (categoryIdInput?: string, mediaSourceIdInput?: string) => void;
+    isFavourite: (categoryIdInput?: string, mediaSourceIdInput?: string) => boolean;
+    loadFavourites: () => void;
+    saveFavourites: () => void;
+    loadFavouritesCategory: () => Promise<void>;
+    toggleShowFavourites: () => void;
+    loadAllFavourites: () => Promise<void>;
     toggleLikeImage: () => void;
     isImageLiked: () => boolean;
     loadLikedImages: () => void;
@@ -147,11 +147,14 @@ interface GalleryState {
     updateProgressBar: () => void;
     loadArchivedCuratedFeeds: () => void;
     saveArchivedCuratedFeeds: () => void;
+    hasFavourites: () => boolean;
+    hasLikedImages: () => boolean;
 }
 
-export const FAVORITES_CATEGORY_ID = 'favorites';
+export const FAVOURITES_CATEGORY_ID = 'favourites';
 export const LIKED_CATEGORY_ID = 'liked';
-export const BIJUKARU_CUSTOM_SOURCE_ID = 'bijukaru_all_sources';
+export const BIJUKARU_CUSTOM_SOURCE_ID = 'bijukaru';
+export const DEFAULT_MEDIA_SOURCE_ID = 'thisiscolossal';
 
 export class GalleryStateClass implements GalleryState {
     loading = $state(true);
@@ -176,7 +179,7 @@ export class GalleryStateClass implements GalleryState {
     prefetchedImages = $state(new Set<string>());
     nToPrefetch = $state(2);
     mediaSources = $state<MediaSource[]>([]);
-    selectedMediaSource = $state("apod");
+    selectedMediaSource = $state(DEFAULT_MEDIA_SOURCE_ID);
     showHelp = $state(false);
     showDescription = $state(false);
     targetImageId = $state<string | null>(null);
@@ -204,8 +207,8 @@ export class GalleryStateClass implements GalleryState {
     controlsTimeoutId = $state<number | null>(null);
     progressIntervalId = $state<number | null>(null);
     category = $state<Category | undefined>(undefined);
-    favorites = $state<Map<string, Set<string>>>(new Map());
-    showFavorites = $state(false);
+    favourites = $state<Map<string, Set<string>>>(new Map());
+    showFavourites = $state(false);
     likedImages = $state<ImageItem[]>([]);
     showLikedImages = $state(false);
 
@@ -222,13 +225,15 @@ export class GalleryStateClass implements GalleryState {
     }
 
     get currentCategoryName() {
-        if (this.showFavorites) {
-            return this.currentItem?.sourceCategory || 'Favorites'; // Display specific category for favorited item
+        // If we're viewing favourites and have a current item with sourceCategory, use that
+        if (this.showFavourites && this.currentItem?.sourceCategory) {
+            return this.currentItem.sourceCategory;
         }
         if (this.showLikedImages) return 'Liked Images';
         // Handle curated stories - assuming title is stored in a way accessible here
-        // For now, let's use the fetched category name or a fallback
-        if (this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID) return this.category?.name || 'Curated Story';
+        if (this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID && this.category?.id && ![FAVOURITES_CATEGORY_ID, LIKED_CATEGORY_ID].includes(this.category.id)) {
+            return this.category.name || 'Curated Story';
+        }
         return this.category ? this.category.name : (this.categories.find(c => c.id === this.selectedCategory)?.name || this.selectedCategory || 'Loading...');
     }
 
@@ -241,11 +246,15 @@ export class GalleryStateClass implements GalleryState {
         // Apply dark mode on page load
         this.applyTheme();
 
-        // Load favorites from localStorage
-        this.loadFavorites();
+        // Load favourites from localStorage
+        this.loadFavourites();
 
         // Load archived curated feeds from localStorage
         this.loadArchivedCuratedFeeds();
+        // Ensure categories are up to date if custom source is selected
+        if (this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID) {
+            await this.loadCategories();
+        }
 
         // Track mouse position
         this.mouseX = 0;
@@ -292,12 +301,6 @@ export class GalleryStateClass implements GalleryState {
 
         // Fetch categories first
         await this.loadCategories();
-
-        // Check for favorites view parameter
-        const favoritesParam = urlParams.get('favorites');
-        if (favoritesParam === 'true') {
-            this.showFavorites = true;
-        }
 
         // Check for category parameter
         const categoryParam = urlParams.get('category');
@@ -480,11 +483,6 @@ export class GalleryStateClass implements GalleryState {
         // Load archived curated feeds from localStorage
         this.loadArchivedCuratedFeeds();
 
-        // Check for liked images view parameter
-        const likedParam = urlParams.get('liked');
-        if (likedParam === 'true') {
-            this.showLikedImages = true;
-        }
     }
     handleImageError = (event: Event) => {
 
@@ -501,9 +499,9 @@ export class GalleryStateClass implements GalleryState {
             title = `${sourceInfo.name} - ${title}`;
         }
 
-        // Add favorites or liked images indicator
-        if (this.showFavorites) {
-            title = `⭐ Favorites - ${title}`;
+        // Add favourites or liked images indicator
+        if (this.showFavourites) {
+            title = `⭐ Favourites - ${title}`;
         } else if (this.showLikedImages) {
             title = `❤️ Liked Images - ${title}`;
         }
@@ -524,8 +522,8 @@ export class GalleryStateClass implements GalleryState {
             // Set media source
             url.searchParams.set('media_source', this.selectedMediaSource);
 
-            // Set category unless we're in favorites view
-            if (!this.showFavorites && this.selectedCategory) {
+            // Set category unless we're in favourites view
+            if (!this.showFavourites && this.selectedCategory) {
                 url.searchParams.set('category', this.selectedCategory);
             } else {
                 url.searchParams.delete('category');
@@ -566,20 +564,6 @@ export class GalleryStateClass implements GalleryState {
                 url.searchParams.delete('showDescription');
             }
 
-            // Set favorites view parameter
-            if (this.showFavorites) {
-                url.searchParams.set('favorites', 'true');
-            } else {
-                url.searchParams.delete('favorites');
-            }
-
-            // Set liked images view parameter
-            if (this.showLikedImages) {
-                url.searchParams.set('liked', 'true');
-            } else {
-                url.searchParams.delete('liked');
-            }
-
             // Update the browser URL without refreshing
             pushState(url.toString(), {
                 mediaSource: this.selectedMediaSource,
@@ -607,8 +591,8 @@ export class GalleryStateClass implements GalleryState {
 
     // Get current category name
     getCurrentCategoryName = () => {
-        // If we're viewing favorites and have a current item with sourceCategory, use that
-        if (this.showFavorites && this.currentItem?.sourceCategory) {
+        // If we're viewing favourites and have a current item with sourceCategory, use that
+        if (this.showFavourites && this.currentItem?.sourceCategory) {
             return this.currentItem.sourceCategory;
         }
 
@@ -955,18 +939,18 @@ export class GalleryStateClass implements GalleryState {
             if (this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID) {
                 // Build categories for "All Sources"
                 const customCategories: Category[] = [
-                    { id: FAVORITES_CATEGORY_ID, name: 'Favorites' },
+                    { id: FAVOURITES_CATEGORY_ID, name: 'Favourites' },
                     { id: LIKED_CATEGORY_ID, name: 'Liked Images' },
                     // Add archived curated feeds (map to Category for dropdown)
                     ...this.archivedCuratedFeeds.map(feed => ({ id: feed.id, name: feed.name }))
                 ];
                 this.categories = customCategories;
 
-                // Default to Favorites if no specific custom view is active or set
-                if (!this.showFavorites && !this.showLikedImages && (!this.selectedCategory || !customCategories.find(c => c.id === this.selectedCategory))) {
-                    this.selectedCategory = FAVORITES_CATEGORY_ID;
-                } else if (this.showFavorites) {
-                    this.selectedCategory = FAVORITES_CATEGORY_ID;
+                // Default to Favourites if no specific custom view is active or set
+                if (!this.showFavourites && !this.showLikedImages && (!this.selectedCategory || !customCategories.find(c => c.id === this.selectedCategory))) {
+                    this.selectedCategory = FAVOURITES_CATEGORY_ID;
+                } else if (this.showFavourites) {
+                    this.selectedCategory = FAVOURITES_CATEGORY_ID;
                 } else if (this.showLikedImages) {
                     this.selectedCategory = LIKED_CATEGORY_ID;
                 }
@@ -976,7 +960,7 @@ export class GalleryStateClass implements GalleryState {
                 this.category = this.categories[this.categoryIndex];
 
             } else {
-            // Fetch categories for regular media sources
+                // Fetch categories for regular media sources
                 const response = await fetch(`/api/${this.selectedMediaSource}/categories`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch categories');
@@ -1004,15 +988,18 @@ export class GalleryStateClass implements GalleryState {
 
         // Handle custom source selections first
         if (this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID) {
-            if (this.selectedCategory === FAVORITES_CATEGORY_ID) {
-                this.showFavorites = true; // Ensure flag is set
+            if (this.selectedCategory === FAVOURITES_CATEGORY_ID) {
+                this.showFavourites = true; // Ensure flag is set
                 this.showLikedImages = false;
-                return this.loadAllFavorites();
+                return this.loadAllFavourites();
             } else if (this.selectedCategory === LIKED_CATEGORY_ID) {
                 this.showLikedImages = true; // Ensure flag is set
-                this.showFavorites = false;
+                this.showFavourites = false;
                 return this.loadLikedImagesView();
             } else {
+                // If a curated feed, ensure both are unselected
+                this.showLikedImages = false;
+                this.showFavourites = false;
                 // This branch will handle loading specific curated feeds by ID in the future
                 // For now, if it's a curated feed that was just loaded by performSearch,
                 // items and category are already set. If user re-selects from dropdown,
@@ -1032,8 +1019,9 @@ export class GalleryStateClass implements GalleryState {
                         return;
                     }
                 } else if (this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID &&
-                    ![FAVORITES_CATEGORY_ID, LIKED_CATEGORY_ID].includes(this.selectedCategory)) {
-
+                    ![FAVOURITES_CATEGORY_ID, LIKED_CATEGORY_ID].includes(this.selectedCategory)) {
+                    this.showLikedImages = false;
+                    this.showFavourites = false;
                     const feedToLoad = this.archivedCuratedFeeds.find(f => f.id === this.selectedCategory);
                     if (feedToLoad) {
                         // Found an archived feed matching the selected category ID
@@ -1051,6 +1039,10 @@ export class GalleryStateClass implements GalleryState {
                     }
                 }
             }
+        } else {
+            // If switching to a regular media source, always unselect favourites/liked
+            this.showFavourites = false;
+            this.showLikedImages = false;
         }
 
         // Show loading state
@@ -1248,19 +1240,11 @@ export class GalleryStateClass implements GalleryState {
                 break;
             case 's':
             case 'S':
-                this.toggleFavorite();
-                break;
-            case 'v':
-            case 'V':
-                this.toggleShowFavorites();
+                this.toggleFavourite();
                 break;
             case 'l':
             case 'L':
                 this.toggleLikeImage();
-                break;
-            case 'i':
-            case 'I':
-                this.toggleShowLikedImages();
                 break;
             default:
                 break;
@@ -1269,7 +1253,7 @@ export class GalleryStateClass implements GalleryState {
 
     // Navigate to previous category
     prevCategory = () => {
-        if (this.categories.length === 0) return;
+        if (this.categories.length === 0) return "";
 
         this.categoryIndex = (this.categoryIndex - 1 + this.categories.length) % this.categories.length;
         this.selectedCategory = this.categories[this.categoryIndex].id;
@@ -1278,7 +1262,7 @@ export class GalleryStateClass implements GalleryState {
 
     // Navigate to next category
     nextCategory = () => {
-        if (this.categories.length === 0) return;
+        if (this.categories.length === 0) return "";
 
         this.categoryIndex = (this.categoryIndex + 1) % this.categories.length;
         this.selectedCategory = this.categories[this.categoryIndex].id;
@@ -1316,11 +1300,11 @@ export class GalleryStateClass implements GalleryState {
                 this.selectedMediaSource = sourceFromUrl;
             } else if (this.mediaSources.length > 0 && !this.mediaSources.find(s => s.id === this.selectedMediaSource)) {
                 // If current selection is invalid (e.g. after custom view), and no valid URL param, pick first non-custom
-                const firstValidSource = this.mediaSources.find(s => s.id !== BIJUKARU_CUSTOM_SOURCE_ID);
+                const firstValidSource = this.mediaSources.find(s => s.id == DEFAULT_MEDIA_SOURCE_ID)
                 this.selectedMediaSource = firstValidSource ? firstValidSource.id : (this.mediaSources[0]?.id || '');
             } else if (this.mediaSources.length > 0 && this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID && !sourceFromUrl) {
                 // If coming from a custom view, default to the first non-custom source
-                const firstValidSource = this.mediaSources.find(s => s.id !== BIJUKARU_CUSTOM_SOURCE_ID);
+                const firstValidSource = this.mediaSources.find(s => s.id == DEFAULT_MEDIA_SOURCE_ID);
                 this.selectedMediaSource = firstValidSource ? firstValidSource.id : (this.mediaSources[0]?.id || '');
             }
 
@@ -1521,7 +1505,7 @@ export class GalleryStateClass implements GalleryState {
                     this.selectedCategory = newCategory.id;
 
                     // Reset view states
-                    this.showFavorites = false;
+                    this.showFavourites = false;
                     this.showLikedImages = false;
 
                     this.currentIndex = 0;
@@ -1552,7 +1536,7 @@ export class GalleryStateClass implements GalleryState {
                 // Handle regular search response (URL redirect)
                 console.log("Search successful, received URL:", result.url);
                 if (result.url) {
-                // Store message to show on next page load
+                    // Store message to show on next page load
                     if (result.userfriendly_message) {
                         localStorage.setItem('bijukaru_message', result.userfriendly_message);
                     }
@@ -1578,7 +1562,7 @@ export class GalleryStateClass implements GalleryState {
         // If switching away from a custom view, clear relevant flags
         if (currentSourceId === BIJUKARU_CUSTOM_SOURCE_ID && targetSourceId !== BIJUKARU_CUSTOM_SOURCE_ID) {
             console.log("Switching FROM custom source TO regular source:", targetSourceId);
-            this.showFavorites = false;
+            this.showFavourites = false;
             this.showLikedImages = false;
             // If we have a previously saved state, restore it
             if (this.previousSelectedMediaSource && this.previousSelectedCategory) {
@@ -1604,18 +1588,18 @@ export class GalleryStateClass implements GalleryState {
 
             this.selectedMediaSource = BIJUKARU_CUSTOM_SOURCE_ID;
             // Clear flags that might be incorrectly set
-            this.showFavorites = false;
+            this.showFavourites = false;
             this.showLikedImages = false;
-            // `loadCategories` will set the default custom category (e.g., Favorites)
-            await this.loadCategories(); // This will setup categories: Favorites, Liked
-            await this.loadCategory();   // This will load the default (Favorites)
+            // `loadCategories` will set the default custom category (e.g., Favourites)
+            await this.loadCategories(); // This will setup categories: Favourites, Liked
+            await this.loadCategory();   // This will load the default (Favourites)
             this.updateURL();
             return; // Exit after handling manual switch TO custom source
         }
         // If we reach here, it's either:
         // 1. Switching between two regular sources
         // 2. Switching away from custom source without saved state (handled by fallthrough)
-        // 3. An internal state update (e.g. from toggleShowFavorites setting source) - less likely via this func
+        // 3. An internal state update (e.g. from toggleShowFavourites setting source) - less likely via this func
         console.log("Proceeding with regular source change or fallthrough:", targetSourceId);
         this.selectedMediaSource = targetSourceId;
 
@@ -1719,63 +1703,63 @@ export class GalleryStateClass implements GalleryState {
         this.updateURL();
     }
 
-    // Favorites methods
-    loadFavorites = () => {
+    // Favourites methods
+    loadFavourites = () => {
         try {
-            const favoritesData = localStorage.getItem('galleryFavorites');
-            if (favoritesData) {
+            const favouritesData = localStorage.getItem('galleryFavourites');
+            if (favouritesData) {
                 // Convert the serialized data back to a Map<string, Set<string>>
-                const parsed = JSON.parse(favoritesData);
-                const favoritesMap = new Map();
+                const parsed = JSON.parse(favouritesData);
+                const favouritesMap = new Map();
 
                 Object.keys(parsed).forEach(mediaSource => {
-                    favoritesMap.set(mediaSource, new Set(parsed[mediaSource]));
+                    favouritesMap.set(mediaSource, new Set(parsed[mediaSource]));
                 });
 
-                this.favorites = favoritesMap;
+                this.favourites = favouritesMap;
             }
         } catch (error) {
-            console.error('Error loading favorites:', error);
+            console.error('Error loading favourites:', error);
         }
     }
 
-    saveFavorites = () => {
+    saveFavourites = () => {
         try {
             // Convert Map<string, Set<string>> to a serializable object
-            const serializedFavorites: Record<string, string[]> = {};
+            const serializedFavourites: Record<string, string[]> = {};
 
-            this.favorites.forEach((categories, mediaSource) => {
-                serializedFavorites[mediaSource] = Array.from(categories);
+            this.favourites.forEach((categories, mediaSource) => {
+                serializedFavourites[mediaSource] = Array.from(categories);
             });
 
-            localStorage.setItem('galleryFavorites', JSON.stringify(serializedFavorites));
+            localStorage.setItem('galleryFavourites', JSON.stringify(serializedFavourites));
         } catch (error) {
-            console.error('Error saving favorites:', error);
+            console.error('Error saving favourites:', error);
         }
     }
 
-    toggleFavorite = (categoryIdInput?: string, mediaSourceIdInput?: string) => {
-        const mediaSource = mediaSourceIdInput || (this.showFavorites && this.currentItem?.media_source) || this.selectedMediaSource;
-        const category = categoryIdInput || (this.showFavorites && this.currentItem?.category_id) || this.selectedCategory;
+    toggleFavourite = (categoryIdInput?: string, mediaSourceIdInput?: string) => {
+        const mediaSource = mediaSourceIdInput || (this.showFavourites && this.currentItem?.media_source) || this.selectedMediaSource;
+        const category = categoryIdInput || (this.showFavourites && this.currentItem?.category_id) || this.selectedCategory;
 
         if (!category || !mediaSource) {
-            console.warn("ToggleFavorite: category or mediaSource missing", category, mediaSource);
+            console.warn("ToggleFavourite: category or mediaSource missing", category, mediaSource);
             return;
         }
 
-        if (!this.favorites.has(mediaSource)) {
-            this.favorites.set(mediaSource, new Set());
+        if (!this.favourites.has(mediaSource)) {
+            this.favourites.set(mediaSource, new Set());
         }
 
-        const sourceCategories = this.favorites.get(mediaSource)!;
-        // let isNowFavorite = false; // This variable was declared but its value never read.
+        const sourceCategories = this.favourites.get(mediaSource)!;
+        // let isNowFavourite = false; // This variable was declared but its value never read.
 
         if (sourceCategories.has(category)) {
             sourceCategories.delete(category);
-            this.showUrlMessage('Removed from favorites');
-            // isNowFavorite = false; // This variable was declared but its value never read.
+            this.showUrlMessage('Removed from favourites');
+            // isNowFavourite = false; // This variable was declared but its value never read.
 
-            if (this.showFavorites) {
+            if (this.showFavourites) {
                 const categoryIdToRemove = category;
                 const mediaSourceIdToRemove = mediaSource;
 
@@ -1783,18 +1767,18 @@ export class GalleryStateClass implements GalleryState {
                     !(item.category_id === categoryIdToRemove && item.media_source === mediaSourceIdToRemove)
                 );
 
-                if (this.items.length === 0) { // Current favorites view is empty
-                    // Check if *any* favorites remain in the this.favorites map across all sources
-                    let noFavoritesLeftAtAll = true;
-                    this.favorites.forEach(set => {
+                if (this.items.length === 0) { // Current favourites view is empty
+                    // Check if *any* favourites remain in the this.favourites map across all sources
+                    let noFavouritesLeftAtAll = true;
+                    this.favourites.forEach(set => {
                         if (set.size > 0) {
-                            noFavoritesLeftAtAll = false;
+                            noFavouritesLeftAtAll = false;
                         }
                     });
 
-                    if (noFavoritesLeftAtAll) {
-                        // All favorites are gone from the system. Redirect to a non-custom source.
-                        this.showFavorites = false;
+                    if (noFavouritesLeftAtAll) {
+                        // All favourites are gone from the system. Redirect to a non-custom source.
+                        this.showFavourites = false;
                         this.showLikedImages = false; // Ensure this is also off
 
                         const firstNonCustomSource = this.mediaSources.find(s => s.id !== BIJUKARU_CUSTOM_SOURCE_ID);
@@ -1818,14 +1802,14 @@ export class GalleryStateClass implements GalleryState {
                             this.updateDocumentTitle();
                             this.stopAutoSlide();
                         }
-                        return; // Exit toggleFavorite as we've handled the redirection
+                        return; // Exit toggleFavourite as we've handled the redirection
                     } else {
-                        // Favorites still exist elsewhere in the system, but this specific view became empty.
-                        this.toggleShowFavorites(); // This will handle restoring previous state or defaulting.
-                        return; // Exit toggleFavorite
+                        // Favourites still exist elsewhere in the system, but this specific view became empty.
+                        this.toggleShowFavourites(); // This will handle restoring previous state or defaulting.
+                        return; // Exit toggleFavourite
                     }
                 } else {
-                    // Items still remain in the current favorites view, just update the current item.
+                    // Items still remain in the current favourites view, just update the current item.
                     this.currentIndex = Math.max(0, Math.min(this.currentIndex, this.items.length - 1));
                     this.updateDocumentTitle();
                     this.updateURL();
@@ -1835,181 +1819,106 @@ export class GalleryStateClass implements GalleryState {
             }
         } else {
             sourceCategories.add(category);
-            this.showUrlMessage('Added to favorites');
-            // isNowFavorite = true; // This variable was declared but its value never read.
+            this.showUrlMessage('Added to favourites');
+            // isNowFavourite = true; // This variable was declared but its value never read.
         }
 
-        this.favorites = new Map(this.favorites);
-        this.saveFavorites();
+        this.favourites = new Map(this.favourites);
+        this.saveFavourites();
     }
 
-    isFavorite = (categoryIdInput?: string, mediaSourceIdInput?: string) => {
-        const mediaSource = mediaSourceIdInput || (this.showFavorites && this.currentItem?.media_source) || this.selectedMediaSource;
-        const category = categoryIdInput || (this.showFavorites && this.currentItem?.category_id) || this.selectedCategory;
+    isFavourite = (categoryIdInput?: string, mediaSourceIdInput?: string) => {
+        const mediaSource = mediaSourceIdInput || (this.showFavourites && this.currentItem?.media_source) || this.selectedMediaSource;
+        const category = categoryIdInput || (this.showFavourites && this.currentItem?.category_id) || this.selectedCategory;
 
         if (!category || !mediaSource) return false;
 
-        return this.favorites.has(mediaSource) &&
-            this.favorites.get(mediaSource)!.has(category);
+        return this.favourites.has(mediaSource) &&
+            this.favourites.get(mediaSource)!.has(category);
     }
 
-    loadFavoritesCategory = async () => {
-        // Store if we're showing favorites before potentially clearing it
-        const wasShowingFavorites = this.showFavorites;
+    loadAllFavourites = async () => {
+        // Store if we're showing favourites before potentially clearing it
+        const wasShowingFavourites = this.showFavourites;
 
         this.loading = true;
         this.error = null;
 
         try {
-            // Get all favorite categories for the current media source
-            const mediaSource = this.selectedMediaSource;
-            if (!this.favorites.has(mediaSource) || this.favorites.get(mediaSource)!.size === 0) {
-                // Show message without switching to favorites view
-                this.showUrlMessage('No favourite categories found. Add categories to your favorites by pressing "s" key or the star icon.');
+            // Get all media sources that have favourites
+            const mediaSourcesWithFavourites = Array.from(this.favourites.keys());
+            if (mediaSourcesWithFavourites.length === 0) {
+                // Show message without switching to favourites view
+                this.showUrlMessage('No favourite categories found. Add categories to your favourites by pressing "s" key or the star icon.');
                 return;
             }
 
-            // Only set showFavorites to true if we have favorites to show
-            this.showFavorites = true;
-            this.items = [];
-
-            const favoriteCategories = Array.from(this.favorites.get(mediaSource)!);
-
-            // Fetch and combine items from all favorite categories
-            let allItems: ImageItem[] = [];
-
-            for (const category of favoriteCategories) {
-                const endpoint = `/api/${mediaSource}/feed?category=${category}${this.isHD ? '&hd=true' : ''}`;
-                const response = await fetch(endpoint);
-
-                if (!response.ok) {
-                    throw new Error(`Failed to load favorites: ${response.statusText}`);
-                }
-
-                const data = await response.json();
-                if (data.items && Array.isArray(data.items)) {
-                    // Add a property to track which category each item belongs to
-                    const categoryName = this.categories.find(c => c.id === category)?.name || category;
-                    const itemsWithCategory = data.items.map((item: ImageItem) => ({
-                        ...item,
-                        sourceCategory: categoryName
-                    }));
-
-                    allItems = [...allItems, ...itemsWithCategory];
-                }
-            }
-
-            if (allItems.length === 0) {
-                // Show message without keeping favorites view
-                this.showUrlMessage('No favourite categories found. Add categories to your favorites by pressing "s" key or the star icon.');
-                this.showFavorites = wasShowingFavorites; // Restore previous state
-
-                // If we weren't already in favorites view, return to previous view
-                if (!wasShowingFavorites && this.previousSelectedMediaSource) {
-                    this.selectedMediaSource = this.previousSelectedMediaSource;
-                    this.selectedCategory = this.previousSelectedCategory || '';
-                    this.previousSelectedMediaSource = null;
-                    this.previousSelectedCategory = null;
-                    await this.loadCategory();
-                }
-                return;
-            }
-
-            // Shuffle items to mix categories
-            this.items = this.shuffleArray(allItems);
-            this.currentIndex = 0;
-
-            // Update URL to reflect we're viewing favorites
-            const url = new URL(window.location.href);
-            url.searchParams.set('favorites', 'true');
-            pushState(url.toString(), {});
-
-            // Start auto slide if not paused
-            if (!this.isPaused) {
-                this.startAutoSlide();
-            }
-
-            // Update document title
-            this.updateDocumentTitle();
-        } catch (error: any) {
-            console.error('Error loading favorites:', error);
-            this.error = error.message || 'Failed to load favorites';
-            this.showFavorites = wasShowingFavorites; // Restore previous state
-        } finally {
-            this.loading = false;
-        }
-    }
-
-    loadAllFavorites = async () => {
-        // Store if we're showing favorites before potentially clearing it
-        const wasShowingFavorites = this.showFavorites;
-
-        this.loading = true;
-        this.error = null;
-
-        try {
-            // Get all media sources that have favorites
-            const mediaSourcesWithFavorites = Array.from(this.favorites.keys());
-            if (mediaSourcesWithFavorites.length === 0) {
-                // Show message without switching to favorites view
-                this.showUrlMessage('No favourite categories found. Add categories to your favorites by pressing "s" key or the star icon.');
-                return;
-            }
-
-            // Only set showFavorites to true if we have favorites to show
-            this.showFavorites = true;
+            // Only set showFavourites to true if we have favourites to show
+            this.showFavourites = true;
             this.items = [];
 
             let allItems: ImageItem[] = [];
 
-            // For each media source with favorites
-            for (const mediaSourceId of mediaSourcesWithFavorites) { // mediaSourceId is the ID
+            // For each media source with favourites
+            for (const mediaSourceId of mediaSourcesWithFavourites) { // mediaSourceId is the ID
                 let categoriesForCurrentSource: Category[] = [];
-                try {
-                    const catResponse = await fetch(`/api/${mediaSourceId}/categories`);
-                    if (catResponse.ok) {
-                        categoriesForCurrentSource = await catResponse.json();
-                    } else {
-                        console.warn(`Could not fetch categories for source ${mediaSourceId} during favorite loading. Status: ${catResponse.status}`);
-                    }
-                } catch (e) {
-                    console.warn(`Error fetching categories for source ${mediaSourceId} in loadAllFavorites:`, e);
-                }
-
-                const favoriteCategories = Array.from(this.favorites.get(mediaSourceId)!);
-
-                // For each favorite category in this media source
-                for (const categoryId of favoriteCategories) { // categoryId is the ID
-                    const endpoint = `/api/${mediaSourceId}/feed?category=${categoryId}${this.isHD ? '&hd=true' : ''}`;
-                    const response = await fetch(endpoint);
-
-                    if (!response.ok) {
-                        console.warn(`Failed to load favorites from ${mediaSourceId}/${categoryId}: ${response.statusText}`);
-                        continue; // Skip this category but continue with others
-                    }
-
-                    const data = await response.json();
-                    if (data.items && Array.isArray(data.items)) {
-                        // Add properties to track source and category
-                        const resolvedSourceName = this.mediaSources.find(s => s.id === mediaSourceId)?.name || mediaSourceId;
-                        // Use categoriesForCurrentSource to find the name
-                        const resolvedCategoryName = categoriesForCurrentSource.find(c => c.id === categoryId)?.name || categoryId;
-                        const itemsWithSourceInfo = data.items.map((item: ImageItem) => ({
+                if (mediaSourceId === BIJUKARU_CUSTOM_SOURCE_ID) {
+                    categoriesForCurrentSource = [{ id: LIKED_CATEGORY_ID, name: 'Liked' }];
+                    if (Array.from(this.favourites.get(BIJUKARU_CUSTOM_SOURCE_ID)!).includes(LIKED_CATEGORY_ID)) {
+                        allItems = [...allItems, ...this.likedImages.map(item => ({
                             ...item,
-                            sourceCategory: `${resolvedSourceName} - ${resolvedCategoryName}`, // For display
-                            media_source: mediaSourceId, // Store the actual media source ID
-                            category_id: categoryId      // Store the actual category ID
-                        }));
+                            sourceCategory: 'Bijukaru - Liked',
+                            media_source: BIJUKARU_CUSTOM_SOURCE_ID,
+                            category_id: LIKED_CATEGORY_ID
+                        }))];
+                    }
+                } else {
+                    try {
+                        const catResponse = await fetch(`/api/${mediaSourceId}/categories`);
+                        if (catResponse.ok) {
+                            categoriesForCurrentSource = await catResponse.json();
+                        } else {
+                            console.warn(`Could not fetch categories for source ${mediaSourceId} during favourite loading. Status: ${catResponse.status}`);
+                        }
+                    } catch (e) {
+                        console.warn(`Error fetching categories for source ${mediaSourceId} in loadAllFavourites:`, e);
+                    }
 
-                        allItems = [...allItems, ...itemsWithSourceInfo];
+                    const favouriteCategories = Array.from(this.favourites.get(mediaSourceId)!);
+
+                    // For each favourite category in this media source
+                    for (const categoryId of favouriteCategories) { // categoryId is the ID
+                        const endpoint = `/api/${mediaSourceId}/feed?category=${categoryId}${this.isHD ? '&hd=true' : ''}`;
+                        const response = await fetch(endpoint);
+
+                        if (!response.ok) {
+                            console.warn(`Failed to load favourites from ${mediaSourceId}/${categoryId}: ${response.statusText}`);
+                            continue; // Skip this category but continue with others
+                        }
+
+                        const data = await response.json();
+                        if (data.items && Array.isArray(data.items)) {
+                            // Add properties to track source and category
+                            const resolvedSourceName = this.mediaSources.find(s => s.id === mediaSourceId)?.name || mediaSourceId;
+                            // Use categoriesForCurrentSource to find the name
+                            const resolvedCategoryName = categoriesForCurrentSource.find(c => c.id === categoryId)?.name || categoryId;
+                            const itemsWithSourceInfo = data.items.map((item: ImageItem) => ({
+                                ...item,
+                                sourceCategory: `${resolvedSourceName} - ${resolvedCategoryName}`, // For display
+                                media_source: mediaSourceId, // Store the actual media source ID
+                                category_id: categoryId      // Store the actual category ID
+                            }));
+
+                            allItems = [...allItems, ...itemsWithSourceInfo];
+                        }
                     }
                 }
             }
 
             if (allItems.length === 0) {
-                // Show message without keeping favorites view
-                this.showUrlMessage('No favourite categories found. Add categories to your favorites by pressing "s" key or the star icon.');
-                this.showFavorites = wasShowingFavorites; // Restore previous state
+                // Show message without keeping favourites view
+                this.showUrlMessage('No favourite categories found. Add categories to your favourites by pressing "s" key or the star icon.');
+                this.showFavourites = wasShowingFavourites; // Restore previous state
                 return;
             }
 
@@ -2017,11 +1926,6 @@ export class GalleryStateClass implements GalleryState {
             this.items = this.shuffleArray(allItems);
             this.currentIndex = 0;
 
-            // Update URL to reflect we're viewing all favorites
-            const url = new URL(window.location.href);
-            url.searchParams.set('favorites', 'true');
-            pushState(url.toString(), {});
-
             // Start auto slide if not paused
             if (!this.isPaused) {
                 this.startAutoSlide();
@@ -2030,24 +1934,24 @@ export class GalleryStateClass implements GalleryState {
             // Update document title
             this.updateDocumentTitle();
         } catch (error: any) {
-            console.error('Error loading all favorites:', error);
-            this.error = error.message || 'Failed to load favorites';
-            this.showFavorites = wasShowingFavorites; // Restore previous state
+            console.error('Error loading all favourites:', error);
+            this.error = error.message || 'Failed to load favourites';
+            this.showFavourites = wasShowingFavourites; // Restore previous state
         } finally {
             this.loading = false;
         }
     }
 
-    toggleShowFavorites = () => {
-        const activating = !this.showFavorites;
+    toggleShowFavourites = () => {
+        const activating = !this.showFavourites;
 
         if (activating) {
-            // Check if there are any favorites before activating
-            const hasAnyFavorites = this.favorites.size > 0 && Array.from(this.favorites.values()).some(set => set.size > 0);
+            // Check if there are any favourites before activating
+            const hasAnyFavourites = this.favourites.size > 0 && Array.from(this.favourites.values()).some(set => set.size > 0);
 
-            if (!hasAnyFavorites) {
-                // Show message without switching to favorites view
-                this.showUrlMessage('No favourite categories found. Add categories to your favorites by pressing "s" key or the star icon.');
+            if (!hasAnyFavourites) {
+                // Show message without switching to favourites view
+                this.showUrlMessage('No favourite categories found. Add categories to your favourites by pressing "s" key or the star icon.');
                 return;
             }
 
@@ -2057,19 +1961,19 @@ export class GalleryStateClass implements GalleryState {
                 this.previousSelectedCategory = this.selectedCategory;
             }
 
-            this.showFavorites = true;
+            this.showFavourites = true;
             this.showLikedImages = false; // Can't show both
 
             this.selectedMediaSource = BIJUKARU_CUSTOM_SOURCE_ID;
             // Set categories and selected category for the dropdown
-            this.categories = [{ id: FAVORITES_CATEGORY_ID, name: 'Favorites' }];
-            this.selectedCategory = FAVORITES_CATEGORY_ID;
+            this.categories = [{ id: FAVOURITES_CATEGORY_ID, name: 'Favourites' }];
+            this.selectedCategory = FAVOURITES_CATEGORY_ID;
             this.category = this.categories[0]; // Update internal category reference
             this.categoryIndex = 0;
-            // Load items from all favorited categories across all sources
-            this.loadAllFavorites();
+            // Load items from all favourited categories across all sources
+            this.loadAllFavourites();
         } else {
-            this.showFavorites = false;
+            this.showFavourites = false;
             // Restore previous state
             this.selectedMediaSource = this.previousSelectedMediaSource || this.mediaSources.find(s => s.id !== BIJUKARU_CUSTOM_SOURCE_ID)?.id || this.mediaSources[0]?.id || '';
             this.selectedCategory = this.previousSelectedCategory || '';
@@ -2158,11 +2062,6 @@ export class GalleryStateClass implements GalleryState {
             this.items = [...this.likedImages];
             this.currentIndex = 0;
 
-            // Update URL to reflect we're viewing liked images
-            const url = new URL(window.location.href);
-            url.searchParams.set('liked', 'true');
-            pushState(url.toString(), {});
-
             // Start auto slide if not paused
             if (!this.isPaused) {
                 this.startAutoSlide();
@@ -2182,7 +2081,7 @@ export class GalleryStateClass implements GalleryState {
     toggleShowLikedImages = () => {
         const activating = !this.showLikedImages;
         this.showLikedImages = activating;
-        this.showFavorites = false; // Can't show both
+        this.showFavourites = false; // Can't show both
 
         if (activating) {
             // Store previous state if not already in a custom view
@@ -2214,24 +2113,31 @@ export class GalleryStateClass implements GalleryState {
     }
 
     loadArchivedCuratedFeeds = () => {
-        try {
-            const data = localStorage.getItem('galleryArchivedCuratedFeeds');
-            if (data) {
-                this.archivedCuratedFeeds = JSON.parse(data);
+        const saved = localStorage.getItem('galleryArchivedCuratedFeeds');
+        if (saved) {
+            try {
+                this.archivedCuratedFeeds = JSON.parse(saved);
+            } catch (e) {
+                console.error('Failed to parse archived curated feeds', e);
             }
-        } catch (error) {
-            console.error('Error loading archived curated feeds:', error);
-            this.archivedCuratedFeeds = [];
         }
-    }
+    };
 
     saveArchivedCuratedFeeds = () => {
-        try {
-            localStorage.setItem('galleryArchivedCuratedFeeds', JSON.stringify(this.archivedCuratedFeeds));
-        } catch (error) {
-            console.error('Error saving archived curatedFeeds:', error);
-        }
-    }
+        localStorage.setItem('galleryArchivedCuratedFeeds', JSON.stringify(this.archivedCuratedFeeds));
+    };
+
+    hasFavourites = () => {
+        // Check if the favourites map has any entries
+        if (!this.favourites) return false;
+        return this.favourites.size > 0;
+    };
+
+    hasLikedImages = () => {
+        // Check if there are any liked images
+        if (!this.likedImages) return false;
+        return this.likedImages.length > 0;
+    };
 
     // Internal method to load a specific archived curated feed from stored data
     _loadSpecificCuratedFeed = (feed: ArchivedCuratedFeed) => {
@@ -2239,7 +2145,7 @@ export class GalleryStateClass implements GalleryState {
         this.loading = true;
         this.error = null;
         this.items = []; // Clear current items
-        this.showFavorites = false; // Ensure these are off
+        this.showFavourites = false; // Ensure these are off
         this.showLikedImages = false;
 
         try {
@@ -2257,7 +2163,7 @@ export class GalleryStateClass implements GalleryState {
 
                 // Ensure the categories dropdown still reflects the custom source options + this loaded one
                 const customCategories: Category[] = [
-                    { id: FAVORITES_CATEGORY_ID, name: 'Favorites' },
+                    { id: FAVOURITES_CATEGORY_ID, name: 'Favourites' },
                     { id: LIKED_CATEGORY_ID, name: 'Liked Images' },
                     ...this.archivedCuratedFeeds.map(f => ({ id: f.id, name: f.name }))
                 ];

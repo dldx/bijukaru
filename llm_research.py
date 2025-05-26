@@ -29,6 +29,9 @@ from schema import Feed, FeedItem, Category
 
 dotenv.load_dotenv()
 
+FAST_MODEL = "google-gla:gemini-2.5-flash-preview-05-20"
+SMART_MODEL = "google-gla:gemini-2.5-flash-preview-05-20"
+
 # --- Pydantic Models for Multi-Agent Flow ---
 
 
@@ -136,7 +139,7 @@ class SuggestedBijukaruUrlParams(BijukaruUrlParams):
 # Define the agent
 # Note: We define the agent *before* decorating the tool function
 agent = Agent(
-    "google-gla:gemini-2.0-flash",  # Using flash for speed/cost, consider 'gemini-1.5-pro'
+    FAST_MODEL,
     output_type=SuggestedBijukaruUrlParams,
     system_prompt=(
         "Extract the gallery parameters from the user's request "
@@ -151,7 +154,7 @@ agent = Agent(
         "Once the tool provides suggestions, use the most relevant one to populate the parameters. "
         "You may also infer additional categories based on your own knowledge, returning the category ids in the correct format. You do not need to stick only to the examples in the case of wikiart, reddit or ukiyo-e media sources."
         "For example, if the user asks for 'katsushika hokusai', you should infer the category id as 'artist:katsushika-hokusai'."
-        "If the user asks for a subreddit suggestion, you should infer the category id as 'subreddit:<subredditname>', for example 'subreddit:foxes'. The subreddit can be any subreddit, not just the ones in the examples. The subreddit should exist."
+        "If the user asks for a subreddit suggestion, you should infer the category id as '<subredditname>', for example 'foxes'. The subreddit can be any subreddit, not just the ones in the examples. The subreddit should exist."
         "Make sure the category_id and image_id are in the correct format for the media source. "
         "For example:"
         "\n- WikiArt artists: 'artist:artist-name-slug'"
@@ -260,13 +263,6 @@ async def get_structured_params(query: str) -> Optional[SuggestedBijukaruUrlPara
     Returns:
         A BijukaruUrlParams instance populated from the query, or None if an error occurs.
     """
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        print("Error: GEMINI_API_KEY environment variable not set.")
-        print(
-            "Please get an API key from https://aistudio.google.com/apikey and set the variable."
-        )
-        return None
 
     print(f"Query: {query}")
 
@@ -303,20 +299,9 @@ async def perform_research(query: str) -> Optional[LLMResearchResult]:
     Returns:
         ResearchResult with research result, or None if an error occurs
     """
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        print("Error: GEMINI_API_KEY environment variable not set.")
-        print(
-            "Please get an API key from https://aistudio.google.com/apikey and set the variable."
-        )
-        return None
-
-    # Using google-gla provider with Gemini model
-    model_name = "google-gla:gemini-2.0-flash"
-
     # Define the agent
     agent = Agent(
-        model_name,
+        SMART_MODEL,
         output_type=LLMResearchResult,
         system_prompt=(
             "You are a research assistant specializing in art, photography, and other visual media. "
@@ -333,7 +318,7 @@ async def perform_research(query: str) -> Optional[LLMResearchResult]:
         instrument=True,  # Enable instrumentation for logging
     )
 
-    print(f"--- Running Research Agent ({model_name}) ---")
+    print(f"--- Running Research Agent ({SMART_MODEL}) ---")
     print(f"Query: {query}")
 
     try:
@@ -359,7 +344,7 @@ async def perform_research(query: str) -> Optional[LLMResearchResult]:
 
 # Agent 1: Story Curator
 story_curator_agent = Agent(
-    "google-gla:gemini-2.0-flash",
+    SMART_MODEL,
     output_type=NarrativePlan,
     system_prompt=(
         "You are an expert art historian and storyteller. Your task is to create a narrative plan based on the user's query (e.g., 'Van Gogh's life in 3 paintings'). "
@@ -391,7 +376,7 @@ async def perform_research_for_curator(query: str) -> Optional[LLMResearchResult
 
 # Agent 2: Detail Researcher
 detail_researcher_agent = Agent(
-    "google-gla:gemini-2.0-flash",
+    SMART_MODEL,
     output_type=FeedItem,
     system_prompt="""You are a meticulous research assistant specializing in finding visual media details.
 Your input is a JSON object describing a specific artwork (`ResearchRequest` with title and optional artist) and potentially some narrative context.

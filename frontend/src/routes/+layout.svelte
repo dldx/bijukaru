@@ -27,7 +27,7 @@
 
 </script>
 
-<div class="bg-gray-100 dark:bg-dark-bg text-gray-900 dark:text-dark-text transition-colors duration-300 main-container">
+<div style="background-color: #121212" class="bg-gray-100 dark:bg-dark-bg text-gray-900 dark:text-dark-text transition-colors duration-300 main-container">
     <!-- Help Overlay -->
     {#if galleryState.showHelp}
         <div class="help-overlay" onclick={(e) => { e.stopPropagation(); galleryState.showHelp = false }}
@@ -95,19 +95,11 @@
                         </tr>
                         <tr>
                             <td><span class="key">S</span></td>
-                            <td>Toggle favorite for current category</td>
-                        </tr>
-                        <tr>
-                            <td><span class="key">V</span></td>
-                            <td>View favorites for current media source</td>
+                            <td>Toggle favourite for current category</td>
                         </tr>
                         <tr>
                             <td><span class="key">L</span></td>
                             <td>Like/unlike current image</td>
-                        </tr>
-                        <tr>
-                            <td><span class="key">I</span></td>
-                            <td>View all liked images</td>
                         </tr>
                     </tbody>
                 </table>
@@ -242,7 +234,7 @@
     {/if}
 
     <!-- Gallery section -->
-    {#if galleryState.items.length > 0}
+    {#if galleryState.items.length >= 0}
         <div class="gallery-wrapper">
             <!-- Exit fullscreen button for mobile -->
             {#if galleryState.hideToolbar || galleryState.isFullscreen}
@@ -428,29 +420,29 @@
                             class:mobile-truncate={galleryState.selectedMediaSource !== 'wikiart'}
                         class="flex items-center bg-black/50 ml-3 px-3 py-1 rounded-full text-sm">
                         <span>{galleryState.currentCategoryName}</span>
-                        <!-- Favorite Star Icon -->
+                        <!-- Favourite Star Icon -->
                         <button
-                            aria-label="Toggle favorites"
+                            aria-label="Toggle favourites"
                             onclick={(e) => {
                                 e.stopPropagation();
-                                if (galleryState.showFavorites && galleryState.currentItem) {
-                                    galleryState.toggleFavorite(galleryState.currentItem.category_id, galleryState.currentItem.media_source);
+                                if (galleryState.showFavourites && galleryState.currentItem) {
+                                    galleryState.toggleFavourite(galleryState.currentItem.category_id, galleryState.currentItem.media_source);
                                 } else {
-                                    galleryState.toggleFavorite();
+                                    galleryState.toggleFavourite();
                                 }
                             }}
                             class="ml-2 focus:outline-none"
                             title={
-                                galleryState.showFavorites && galleryState.currentItem ?
-                                (galleryState.isFavorite(galleryState.currentItem.category_id, galleryState.currentItem.media_source) ? "Remove from favorites" : "Add to favorites") :
-                                (galleryState.isFavorite() ? "Remove from favorites" : "Add to favorites")
+                                galleryState.showFavourites && galleryState.currentItem ?
+                                (galleryState.isFavourite(galleryState.currentItem.category_id, galleryState.currentItem.media_source) ? "Remove from favourites" : "Add to favourites") :
+                                (galleryState.isFavourite() ? "Remove from favourites" : "Add to favourites")
                             }>
                             <svg xmlns="http://www.w3.org/2000/svg"
                                 class="w-5 h-5"
                                 fill={
-                                    galleryState.showFavorites && galleryState.currentItem ?
-                                    (galleryState.isFavorite(galleryState.currentItem.category_id, galleryState.currentItem.media_source) ? "currentColor" : "none") :
-                                    (galleryState.isFavorite() ? "currentColor" : "none")
+                                    galleryState.showFavourites && galleryState.currentItem ?
+                                    (galleryState.isFavourite(galleryState.currentItem.category_id, galleryState.currentItem.media_source) ? "currentColor" : "none") :
+                                    (galleryState.isFavourite() ? "currentColor" : "none")
                                 }
                                 viewBox="0 0 24 24"
                                 stroke="currentColor">
@@ -463,17 +455,17 @@
                         </div>
                     </div>
 
-                    <!-- Favorites view indicator -->
-                    <!-- {#if galleryState.showFavorites}
-                        <div class="favorites-indicator">
+                    <!-- Favourites view indicator -->
+                    <!-- {#if galleryState.showFavourites}
+                        <div class="favourites-indicator">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
                             </svg>
                             <span>
                                 {#if new URLSearchParams(window.location.search).get('all_sources') === 'true'}
-                                    Viewing all favorites across all media sources
+                                    Viewing all favourites across all media sources
                                 {:else}
-                                    Viewing favorites from {galleryState.currentSourceName}
+                                    Viewing favourites from {galleryState.currentSourceName}
                                 {/if}
                                 {#if galleryState.currentItem?.sourceCategory}
                                     - {galleryState.currentItem.sourceCategory}
@@ -531,12 +523,16 @@
 
                 <div class="flex flex-grow justify-center items-center">
                     <span class="text-gray-600 dark:text-gray-400 text-sm">
+                        {#if galleryState.items.length > 0}
                         <span>{galleryState.currentIndex + 1}</span> of <span>{galleryState.items.length}</span>
+                        {:else}
+                        <span></span>
+                        {/if}
                     </span>
                 </div>
 
                 <!-- Clustered controls group -->
-                <div class="flex justify-center items-center space-x-1 md:space-x-2">
+                <div class="flex justify-between items-center space-x-1 md:space-x-2 w-full md:w-auto">
                     <!-- Search Button (Triggers Overlay) -->
                     <button onclick={() => galleryState.openSearchOverlay()}
                             title="Search ( / )"
@@ -548,18 +544,19 @@
                         </svg>
                     </button>
 
-                    <!-- Favorites Button -->
+                    <!-- Favourites Button -->
                     <button
-                        onclick={() => galleryState.toggleShowFavorites()}
-                        aria-label="Toggle favorites view"
-                        title="Toggle favorites view"
+                        onclick={() => galleryState.toggleShowFavourites()}
+                        aria-label="Toggle favourites view"
+                        title="Toggle favourites view"
                         class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none cursor-pointer"
-                        class:text-yellow-500={galleryState.showFavorites}
-                        class:text-gray-600={!galleryState.showFavorites}
-                        class:dark:text-gray-400={!galleryState.showFavorites}>
+                        class:hidden={!galleryState.hasFavourites()}
+                        class:text-blue-500={galleryState.showFavourites}
+                        class:text-gray-600={!galleryState.showFavourites}
+                        class:dark:text-gray-400={!galleryState.showFavourites}>
                         <svg xmlns="http://www.w3.org/2000/svg"
                             class="w-5 h-5"
-                            fill={galleryState.showFavorites ? "currentColor" : "none"}
+                            fill={galleryState.showFavourites ? "currentColor" : "none"}
                             viewBox="0 0 24 24"
                             stroke="currentColor">
                             <path stroke-linecap="round"
@@ -575,7 +572,8 @@
                         aria-label="View all liked images"
                         title="View all liked images (I)"
                         class="hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none cursor-pointer"
-                        class:text-red-500={galleryState.showLikedImages}
+                        class:hidden={!galleryState.hasLikedImages()}
+                        class:text-blue-500={galleryState.showLikedImages}
                         class:text-gray-600={!galleryState.showLikedImages}
                         class:dark:text-gray-400={!galleryState.showLikedImages}>
                         <svg xmlns="http://www.w3.org/2000/svg"
@@ -717,14 +715,6 @@
                     {/if} -->
                 </div>
             </div>
-
-            <!-- No items message -->
-            <div class:hidden={galleryState.loading || galleryState.items.length > 0 || galleryState.error}
-                class="p-8 text-gray-600 dark:text-gray-400 text-center">
-                No images found in the feed.
-            </div>
-
-            <!-- Main content slot -->
         </div>
     {/if}
 </div>
@@ -1040,7 +1030,7 @@ input:checked + .toggle-slider:before {
     border-top: 1px solid rgba(255,255,255,0.1);
 }
 
-.favorites-indicator {
+.favourites-indicator {
     position: fixed;
     top: 1rem;
     left: 50%;
@@ -1058,7 +1048,7 @@ input:checked + .toggle-slider:before {
     border: 1px solid rgba(251, 191, 36, 0.3);
 }
 
-.favorites-indicator svg {
+.favourites-indicator svg {
     width: 1rem;
     height: 1rem;
     stroke: currentColor;
