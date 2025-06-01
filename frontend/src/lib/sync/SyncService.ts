@@ -40,9 +40,13 @@ export class SyncService {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const host = window.location.hostname;
 
+            if (host === 'localhost' || host === '127.0.0.1') {
+                return `${protocol}//${host}:8787/ws`;
+            } else {
                 // In production, use your deployed Cloudflare Worker URL
                 // Update this with your actual worker subdomain
-            return `ws://bijukaru-sync-worker.durand.workers.dev/ws`;
+                return `wss://bijukaru-sync-worker.durand.workers.dev/ws`;
+            }
         }
         return 'ws://localhost:8787/ws';
     }
