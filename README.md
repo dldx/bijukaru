@@ -1,221 +1,242 @@
-# Bijukaru
+# Bijukaru Gallery with Cross-Device Sync
 
-This is a carousel gallery for art images, supporting multiple media sources including [This is Colossal](https://www.thisiscolossal.com), [Astronomy Picture of the Day](https://apod.nasa.gov/apod/astropix.html), [Ukiyo-e.org](https://ukiyo-e.org), and [WikiArt](https://www.wikiart.org). It's suitable for embedding on other websites or in [Obsidian](https://obsidian.md).
-
-## Architecture
-
-Bijukaru consists of two main components:
-- **Backend**: A FastAPI application that provides API endpoints for different media sources
-- **Frontend**: A Svelte single-page application (SPA) that provides the user interface
+A beautiful gallery application with real-time cross-device synchronization for favorites and liked images.
 
 ## Features
 
-- **Multiple Media Sources**: Switch between different content providers (This is Colossal, Astronomy Picture of the Day, Ukiyo-e.org, Guardian, Reddit, WikiArt)
-- **Content Categories**: Filter gallery content by categories (including popular artists for WikiArt)
-- **Search Functionality**: Search across all media sources using natural language queries (search is disabled by default, requires authentication token to account for LLM costs)
-- **Automatic Slideshow**: Images change automatically with a configurable interval (can be disabled)
-- **Visual Progress Bar**: Shows timing between slide transitions
-- **Image Prefetching**: Preloads upcoming images for smoother transitions
-- **Dark/Light Mode**: Toggle between themes with persistent preferences
-- **Responsive Design**: Works on various screen sizes and devices
-- **Image Navigation**: Previous/next controls for manual browsing
-- **Category Navigation**: Up/down arrows to switch between categories
-- **Keyboard Shortcuts**: Navigation using arrow keys and 'f' for fullscreen
-- **Description Display**: Toggle visibility of image descriptions
-- **Touch-Friendly Controls**: Optimized for mobile devices
-- **Fullscreen Support**: Toggle fullscreen viewing mode
-- **URL Parameters**: Configure via URL parameters (media source, category, interval, prefetch, fullscreen)
-- **Direct Image Links**: Link to specific images using image ID parameter
-- **Image Randomization**: Shuffled display for variety
-- **Original Content Links**: Each image links to its original article
-- **Error Handling**: Graceful handling of broken images
-- **Caching**: Backend caching for improved performance
-- **Clean UI**: Minimal interface with image counter and title overlays
+### Core Gallery Features
+- Beautiful image slideshow with multiple media sources
+- Category-based browsing
+- Search and curation functionality
+- Fullscreen viewing with keyboard shortcuts
+- Responsive design for mobile and desktop
 
-## Usage
+### Cross-Device Sync Features ✨
+- **Real-time synchronization** of favorites and liked images
+- **8-character device tokens** for easy sharing between devices
+- **Automatic conflict resolution** with data merging
+- **Offline support** with local storage fallback
+- **Instant updates** when changes are made on any device
 
-Visit [https://frames.dldx.org](https://frames.dldx.org) to see the gallery in action.
+## How Sync Works
 
-### URL Parameters
+1. **Generate a device token** on your first device (8-character code like `ABC12345`)
+2. **Share the token** with your other devices
+3. **All devices** with the same token will automatically sync:
+   - Favorite categories
+   - Liked images
+   - Real-time updates
 
-- `category`: Filter by specific category (e.g., `?category=art` or `?category=rene-magritte` for WikiArt artists)
-- `image_id`: Display a specific image by ID (e.g., `?image_id=1234abcd`)
-- `interval`: Set custom slideshow timing in seconds (e.g., `?interval=5` for 5 seconds, `?interval=0` to disable auto-slideshow)
-- `prefetch`: Set number of images to preload (e.g., `?prefetch=5` to prefetch 5 upcoming images)
-- `fullscreen`: Start in fullscreen mode (e.g., `?fullscreen=true`)
-- `showDescription`: Show image descriptions by default (e.g., `?showDescription=true`)
-- `token`: Provide authentication token for search functionality (e.g., `?token=yoursecrettoken`)
+## Quick Start
 
-### Keyboard Navigation
-
-- **Left/Right Arrow Keys**: Navigate between images
-- **Enter Key**: Open original image article in new tab
-- **Up/Down Arrow Keys**: Navigate between categories
-- **Page Up/Down Keys**: Navigate between media sources
-- **F Key**: Toggle fullscreen mode
-- **D Key**: Toggle description visibility
-- **P Key**: Pause/resume slideshow
-- **/ Key**: Open search interface
-- **H Key**: Display help with all keyboard shortcuts
-- **Escape Key**: Exit fullscreen mode or close search overlay
-
-### Search Functionality
-
-The search feature allows you to find content across all media sources using natural language queries:
-
-1. Authenticate by adding `?token=yoursecrettoken` to the URL once
-2. After authentication, the search icon appears in the control bar
-3. Click the search icon or press `/` to open the search interface
-4. Type queries like "Van Gogh starry night", "show me photos of supernovae", or "analog art"
-
-## Embedding on other websites
-
-To embed the gallery on your website, copy the following code and paste it into the HTML body of your page:
-
-```html
-<iframe src="https://frames.dldx.org" width="100%" height="500px"></iframe>
+### Frontend Development
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-For additional customization, you can use URL parameters:
+### Cloudflare Worker Setup
+See [SYNC_SETUP.md](SYNC_SETUP.md) for complete deployment instructions.
 
-```html
-<iframe src="https://frames.dldx.org?category=photography&interval=8&prefetch=3&image_id=1234abcd&fullscreen=true&showDescription=true" width="100%" height="500px"></iframe>
+```bash
+cd cloudflare-worker
+npm install
+npm run deploy
 ```
 
-To enable search functionality, include the token parameter once:
+## Using the Sync Feature
 
-```html
-<iframe src="https://frames.dldx.org?token=yoursecrettoken" width="100%" height="500px"></iframe>
+### 1. Generate a Device Token
+On your first device, generate a new 8-character sync token:
+- Go to sync settings in the gallery
+- Click "Generate New Token"
+- Save the token (e.g., `ABC12345`)
+
+### 2. Connect Other Devices
+On each additional device:
+- Go to sync settings
+- Enter the same 8-character token
+- Click "Connect"
+
+### 3. Sync Your Data
+Once connected, all devices will automatically sync:
+- **Favorites**: Star/unstar categories and see changes on all devices
+- **Liked Images**: Like/unlike images and see updates everywhere
+- **Real-time**: Changes appear instantly on connected devices
+
+## Architecture
+
+### Frontend (SvelteKit)
+- **SyncService**: Manages WebSocket connections and data synchronization
+- **GalleryState**: Integrates sync with existing favorites and likes functionality
+- **Local Storage**: Provides offline backup of sync data
+
+### Backend (Cloudflare Workers + Durable Objects)
+- **WebSocket Server**: Handles real-time connections
+- **Durable Objects**: Provides stateful storage per device token
+- **Data Merging**: Automatically resolves conflicts between devices
+
+### Data Flow
+```
+Device A → WebSocket → Cloudflare DO → WebSocket → Device B
+    ↓                                                   ↓
+Local Storage                                    Local Storage
 ```
 
-You can also specify a particular media source:
+## Sync Data Structure
 
-```html
-<iframe src="https://frames.dldx.org/ukiyo-e?interval=10&fullscreen=true" width="100%" height="500px"></iframe>
-```
-
-Or browse WikiArt artists:
-
-```html
-<iframe src="https://frames.dldx.org/wikiart?category=edward-hopper" width="100%" height="500px"></iframe>
-```
-
-## Embedding in Obsidian
-
-To embed the gallery in Obsidian, install [Custom Frames](https://github.com/Ellpeck/ObsidianCustomFrames), add a new frame called "Bijukaru" with the following settings:
-
-**URL**: https://frames.dldx.org
-
-**Additional CSS**:
-```css
-body {
-background-color: rgba(0,0,0, 0) !important;
-}
-.light-toggle {
-display: none !important;
+```typescript
+interface SyncedData {
+    favourites: Record<string, string[]>; // mediaSource -> categoryIds[]
+    likedImages: Array<{
+        id: string;
+        title: string;
+        image_url: string;
+        link: string;
+        // ... other image properties
+    }>;
 }
 ```
 
-and copy the following code and paste it into the note where you want the gallery to appear:
+## API Reference
 
-```
-```custom-frames
-frame: Bijukaru
-style: background-color: unset; height: 800px;```
-```
+### Sync Service Methods
 
-You can also link to specific images by adding URL parameters to the frame URL:
-```
-```custom-frames
-frame: Bijukaru
-url: https://frames.dldx.org?image_id=1234abcd
-style: background-color: unset; height: 800px;```
-```
+```typescript
+// Initialize sync with a device token
+await syncService.initializeSync("ABC12345");
 
-Or specify a particular media source:
-```
-```custom-frames
-frame: Bijukaru
-url: https://frames.dldx.org/ukiyo-e
-style: background-color: unset; height: 800px;```
+// Check connection status
+const isConnected = syncService.isConnectedToSync();
+
+// Get sync statistics
+const stats = syncService.getSyncStats();
+
+// Manually force a sync
+await syncService.forceSync();
+
+// Disconnect from sync
+await syncService.disconnect();
 ```
 
-Or browse WikiArt artists:
-```
-```custom-frames
-frame: Bijukaru
-url: https://frames.dldx.org/wikiart?category=artist:frida-kahlo
-style: background-color: unset; height: 800px;```
+### Gallery State Sync Integration
+
+```typescript
+// Generate and connect with new token
+const token = await galleryState.generateAndConnectDeviceToken();
+
+// Connect with existing token
+const success = await galleryState.connectWithDeviceToken("ABC12345");
+
+// Get sync status
+const status = galleryState.getSyncStatus();
+
+// Disconnect
+await galleryState.disconnectSync();
 ```
 
-To enable search in Obsidian, add the token to the URL:
-```
-```custom-frames
-frame: Bijukaru
-url: https://frames.dldx.org?token=yoursecrettoken
-style: background-color: unset; height: 800px;```
-```
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `←/→` | Previous/Next image |
+| `↑/↓` | Previous/Next category |
+| `S` | Toggle favorite for current category |
+| `L` | Like/unlike current image |
+| `F` | Toggle fullscreen |
+| `P` | Pause/resume slideshow |
+| `/` | Open search |
+| `H` | Show help |
+
+## Configuration
+
+### Environment Variables
+- Development WebSocket: `ws://localhost:8787/ws`
+- Production WebSocket: Configure in `SyncService.ts`
+
+### Sync Settings
+- **Reconnection**: Automatic with exponential backoff
+- **Max Reconnect Attempts**: 5 (configurable)
+- **Token Length**: 8 characters (alphanumeric)
+- **Data Persistence**: Automatic via Durable Objects
+
+## Security
+
+- **Device tokens** provide basic access control
+- **Data isolation** per token group
+- **No user authentication** required
+- **Local storage backup** for offline access
+
+> ⚠️ **Note**: Device tokens are not encrypted. Anyone with a token can access that sync group. For sensitive data, consider adding authentication.
+
+## Costs (Cloudflare Workers)
+
+- **Free tier**: 100,000 requests/day (sufficient for most users)
+- **Paid tier**: $5/month for 10M requests
+- **Durable Objects**: $0.15/million requests after free tier
+
+## Troubleshooting
+
+### Sync Not Working?
+1. Check browser console for WebSocket errors
+2. Verify the device token is exactly 8 characters
+3. Ensure both devices use the same token
+4. Check Cloudflare Worker logs
+5. Test WebSocket connection directly:
+   ```javascript
+   const ws = new WebSocket('wss://your-worker.workers.dev/ws?token=ABC12345');
+   ```
+
+### Performance Issues?
+- Sync is optimized for small data sets (favorites and likes)
+- Large numbers of liked images may affect performance
+- Consider periodic cleanup of old data
 
 ## Development
 
-### Prerequisites
+### Project Structure
+```
+frontend/
+├── src/lib/sync/SyncService.ts         # WebSocket sync client
+├── src/lib/components/GalleryState.svelte.ts  # Gallery state with sync
+└── ...
 
-- Python 3.7+ for the FastAPI backend
-- Node.js 16+ for the Svelte frontend
-- [Bun](https://bun.sh/) (recommended) or npm for frontend package management
+cloudflare-worker/
+├── src/index.ts                        # Worker and Durable Object
+├── src/types.d.ts                      # TypeScript declarations
+├── wrangler.toml                       # Cloudflare configuration
+└── ...
+```
 
-### Setup
+### Building
+```bash
+# Frontend
+cd frontend && npm run build
 
-1. Clone the repository and navigate to the project directory:
-   ```bash
-   git clone https://github.com/yourusername/bijukaru.git
-   cd bijukaru
-   ```
+# Worker
+cd cloudflare-worker && npm run deploy
+```
 
-2. Create a Python virtual environment and install dependencies:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows, use `.venv\Scripts\activate`
-   pip install -r requirements.txt
-   ```
+### Testing
+```bash
+# Local development
+cd cloudflare-worker && npm run dev  # Worker on :8787
+cd frontend && npm run dev            # Frontend on :5173
+```
 
-3. Set up the frontend:
-   ```bash
-   cd frontend
-   bun install  # or npm install
-   ```
+## Contributing
 
-4. Create a `.env` file in the root directory with required variables:
-   ```
-   SEARCH_TOKEN=your_secret_token_here
-   ```
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test sync functionality
+5. Submit a pull request
 
-### Running for Development
+## License
 
-1. Start the FastAPI backend (from the root directory):
-   ```bash
-   python -m uvicorn main:app --reload
-   ```
+MIT License - see LICENSE file for details.
 
-2. In a separate terminal, start the Svelte dev server:
-   ```bash
-   cd frontend
-   bun run dev  # or npm run dev
-   ```
+---
 
-3. Open your browser and navigate to http://localhost:5173
-
-### Building for Production
-
-1. Build the Svelte frontend:
-   ```bash
-   cd frontend
-   bun run build:fastapi  # or npm run build:fastapi
-   ```
-
-2. Start the FastAPI server:
-   ```bash
-   python -m uvicorn main:app
-   ```
-
-The FastAPI server will serve both the API endpoints and the static Svelte SPA.
+**Enjoy synchronized browsing across all your devices!** 🎨✨

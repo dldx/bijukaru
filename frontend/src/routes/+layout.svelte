@@ -101,6 +101,10 @@
                             <td><span class="key">L</span></td>
                             <td>Like/unlike current image</td>
                         </tr>
+                        <tr>
+                            <td><span class="key">Y</span></td>
+                            <td>Open sync settings</td>
+                        </tr>
                     </tbody>
                 </table>
                 <div class="opacity-70 mt-6 text-sm text-center">
@@ -114,6 +118,133 @@
     {#if galleryState.error}
         <div class="relative bg-red-100 dark:bg-red-900 mb-4 px-4 py-3 border border-red-400 dark:border-red-700 rounded text-red-700 dark:text-red-300">
             <span>{galleryState.error}</span>
+        </div>
+    {/if}
+
+    <!-- Sync Settings Overlay -->
+    {#if galleryState.showSyncOverlay}
+        <div class="z-[100] fixed inset-0 flex justify-center items-center bg-black/65 backdrop-blur-sm p-4"
+        onclick={() => galleryState.closeSyncOverlay()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sync-dialog-title"
+        tabindex="0"
+        onkeydown={(e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                galleryState.closeSyncOverlay();
+            }
+        }}
+        >
+            <div class="relative bg-gray-900 dark:bg-dark-surface shadow-xl p-6 rounded-lg w-full max-w-md"
+            onclick={(e) => e.stopPropagation()}
+            onkeydown={(e) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    galleryState.closeSyncOverlay();
+                }
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sync-dialog-title"
+            tabindex="0"
+            >
+                <button onclick={() => galleryState.closeSyncOverlay()} class="top-4 right-4 absolute text-gray-400 hover:text-white text-xl transition-colors cursor-pointer" aria-label="Close sync settings">×</button>
+
+                <h2 id="sync-dialog-title" class="mb-6 font-bold text-white text-xl">Sync Settings</h2>
+
+                <!-- Sync Status -->
+                <div class="mb-6">
+                    {#if galleryState.getSyncStatus().connected}
+                        <div class="flex items-center text-green-400 text-sm">
+                            <svg class="mr-2 w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                            </svg>
+                            Connected - Token: {galleryState.getSyncStatus().deviceToken}
+                        </div>
+                    {:else}
+                        <div class="flex items-center text-gray-400 text-sm">
+                            <svg class="mr-2 w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                            </svg>
+                            Not connected
+                        </div>
+                    {/if}
+                </div>
+
+                {#if !galleryState.getSyncStatus().connected}
+                    <!-- Generate New Token Section -->
+                    <div class="mb-6">
+                        <h3 class="mb-2 font-semibold text-gray-300">Generate New Device Token</h3>
+                        <p class="mb-4 text-gray-400 text-sm">Create a new 8-character token to share with your other devices</p>
+                        <button
+                            onclick={() => galleryState.handleGenerateToken()}
+                            disabled={galleryState.syncGenerating}
+                            class="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-700 px-4 py-2 rounded-md w-full text-white transition-colors cursor-pointer disabled:cursor-not-allowed">
+                            <span class:hidden={galleryState.syncGenerating}>Generate New Token</span>
+                            <span class:hidden={!galleryState.syncGenerating}>Generating...</span>
+                        </button>
+                    </div>
+
+                    <!-- Connect with Existing Token Section -->
+                    <div class="mb-6">
+                        <h3 class="mb-2 font-semibold text-gray-300">Connect with Existing Token</h3>
+                        <p class="mb-4 text-gray-400 text-sm">Enter an 8-character token from another device</p>
+                        <form onsubmit={(e) => {
+                            e.preventDefault();
+                            galleryState.handleConnectWithToken();
+                        }}>
+                            <input
+                                type="text"
+                                bind:value={galleryState.syncTokenInput}
+                                placeholder="Enter 8-character token"
+                                maxlength="8"
+                                class="bg-white/90 dark:bg-gray-200/90 mb-3 px-4 py-2 border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full text-gray-900"
+                                onkeydown={(e) => {
+                                    if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        galleryState.closeSyncOverlay();
+                                    }
+                                }}
+                            />
+                            <button
+                                type="submit"
+                                disabled={galleryState.syncConnecting || galleryState.syncTokenInput.length !== 8}
+                                class="bg-green-500 hover:bg-green-600 disabled:bg-green-700 px-4 py-2 rounded-md w-full text-white transition-colors cursor-pointer disabled:cursor-not-allowed">
+                                <span class:hidden={galleryState.syncConnecting}>Connect</span>
+                                <span class:hidden={!galleryState.syncConnecting}>Connecting...</span>
+                            </button>
+                        </form>
+                        {#if galleryState.syncError}
+                            <div class="mt-2 text-red-400 text-sm">{galleryState.syncError}</div>
+                        {/if}
+                    </div>
+                {:else}
+                    <!-- Connected State Actions -->
+                    <div class="mb-6">
+                        <h3 class="mb-2 font-semibold text-gray-300">Sync Actions</h3>
+                        <button
+                            onclick={() => galleryState.handleDisconnectSync()}
+                            class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-md w-full text-white transition-colors cursor-pointer">
+                            Disconnect from Sync
+                        </button>
+                    </div>
+                {/if}
+
+                <!-- Sync Info -->
+                <div class="pt-4 border-gray-700 border-t">
+                    <h3 class="mb-2 font-semibold text-gray-300 text-sm">How Sync Works</h3>
+                    <ul class="space-y-1 text-gray-400 text-xs">
+                        <li>• Generate a token or use an existing one</li>
+                        <li>• All devices with the same token sync automatically</li>
+                        <li>• Favorites and liked images sync in real-time</li>
+                        <li>• Data is stored locally as backup</li>
+                    </ul>
+                </div>
+            </div>
         </div>
     {/if}
 
@@ -542,6 +673,30 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
                         </svg>
+                    </button>
+
+                    <!-- Sync Button -->
+                    <button
+                        onclick={() => galleryState.openSyncOverlay()}
+                        aria-label="Sync settings"
+                        title="Sync settings"
+                        class="relative hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-full focus:outline-none cursor-pointer"
+                        class:text-green-500={galleryState.getSyncStatus().connected}
+                        class:text-gray-600={!galleryState.getSyncStatus().connected}
+                        class:dark:text-gray-400={!galleryState.getSyncStatus().connected}>
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                            class="w-5 h-5"
+                            fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                        <!-- Connected indicator dot -->
+                        {#if galleryState.getSyncStatus().connected}
+                            <div class="top-1 right-1 absolute bg-green-400 rounded-full w-2 h-2"></div>
+                        {/if}
                     </button>
 
                     <!-- Favourites Button -->

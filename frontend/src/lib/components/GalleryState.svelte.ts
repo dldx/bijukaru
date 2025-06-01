@@ -1,5 +1,7 @@
 import { getContext, setContext } from "svelte";
 import { pushState, replaceState } from "$app/navigation";
+import { browser } from '$app/environment';
+import { syncService } from '../sync/SyncService.js';
 
 // Define types
 interface ImageItem {
@@ -92,6 +94,12 @@ interface GalleryState {
     showFavourites: boolean;
     likedImages: ImageItem[];
     showLikedImages: boolean;
+    // Sync-related properties
+    showSyncOverlay: boolean;
+    syncTokenInput: string;
+    syncGenerating: boolean;
+    syncConnecting: boolean;
+    syncError: string | null;
     // Add method signatures
     updateDocumentTitle: () => void;
     updateURL: () => void;
@@ -149,6 +157,16 @@ interface GalleryState {
     saveArchivedCuratedFeeds: () => void;
     hasFavourites: () => boolean;
     hasLikedImages: () => boolean;
+    // Sync method signatures
+    generateAndConnectDeviceToken: () => Promise<string | null>;
+    connectWithDeviceToken: (token: string) => Promise<boolean>;
+    disconnectSync: () => Promise<void>;
+    getSyncStatus: () => { connected: boolean; deviceToken: string | null; hasToken: boolean };
+    openSyncOverlay: () => void;
+    closeSyncOverlay: () => void;
+    handleGenerateToken: () => Promise<void>;
+    handleConnectWithToken: () => Promise<void>;
+    handleDisconnectSync: () => Promise<void>;
 }
 
 export const FAVOURITES_CATEGORY_ID = 'favourites';
@@ -207,283 +225,458 @@ export class GalleryStateClass implements GalleryState {
     controlsTimeoutId = $state<number | null>(null);
     progressIntervalId = $state<number | null>(null);
     category = $state<Category | undefined>(undefined);
-    favourites = $state<Map<string, Set<string>>>(new Map());
+    favourites = $state(new Map<string, Set<string>>());
     showFavourites = $state(false);
     likedImages = $state<ImageItem[]>([]);
     showLikedImages = $state(false);
+    showSyncOverlay = $state(false);
+    syncTokenInput = $state("");
+    syncGenerating = $state(false);
+    syncConnecting = $state(false);
+    syncError = $state<string | null>(null);
 
-    // State to remember the last selected source/category before viewing custom feeds
+    // Sync-related properties
+    private syncInitialized = $state(false);
+    private deviceToken = $state<string | null>(null);
+
+    // Existing properties from original code
     previousSelectedMediaSource = $state<string | null>(null);
     previousSelectedCategory = $state<string | null>(null);
 
-    // State for storing previously generated curated feeds
+    // Archive curated feeds
     archivedCuratedFeeds = $state<ArchivedCuratedFeed[]>([]);
 
-    // Computed property for current item
     get currentItem() {
         return this.items[this.currentIndex] || null;
     }
 
     get currentCategoryName() {
-        // If we're viewing favourites and have a current item with sourceCategory, use that
-        if (this.showFavourites && this.currentItem?.sourceCategory) {
-            return this.currentItem.sourceCategory;
+        if (this.showFavourites) {
+            return "Favourites";
+        } else if (this.showLikedImages) {
+            return "Liked Images";
+        } else {
+            const current = this.categories[this.categoryIndex];
+            return current ? current.name : "";
         }
-        if (this.showLikedImages) return 'Liked Images';
-        // Handle curated stories - assuming title is stored in a way accessible here
-        if (this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID && this.category?.id && ![FAVOURITES_CATEGORY_ID, LIKED_CATEGORY_ID].includes(this.category.id)) {
-            return this.category.name || 'Curated Story';
-        }
-        return this.category ? this.category.name : (this.categories.find(c => c.id === this.selectedCategory)?.name || this.selectedCategory || 'Loading...');
     }
 
     get currentSourceName() {
-        return this.mediaSources.find(s => s.id === this.selectedMediaSource)?.name || 'Unknown Source';
+        const current = this.mediaSources.find(source => source.id === this.selectedMediaSource);
+        return current ? current.name : "";
     }
 
-    // Initialize gallery
     init = async () => {
-        // Apply dark mode on page load
-        this.applyTheme();
+        if (browser) {
+            // Apply dark mode on page load
+            this.applyTheme();
 
-        // Load favourites from localStorage
-        this.loadFavourites();
+            // Load favourites from localStorage
+            this.loadFavourites();
 
-        // Load archived curated feeds from localStorage
-        this.loadArchivedCuratedFeeds();
-        // Ensure categories are up to date if custom source is selected
-        if (this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID) {
+            // Load archived curated feeds from localStorage
+            this.loadArchivedCuratedFeeds();
+
+            // Initialize sync
+            await this.initializeSync();
+
+            // Ensure categories are up to date if custom source is selected
+            if (this.selectedMediaSource === BIJUKARU_CUSTOM_SOURCE_ID) {
+                await this.loadCategories();
+            }
+
+            // Track mouse position and setup event listeners
+            this.mouseX = 0;
+            this.mouseY = 0;
+            document.addEventListener('mousemove', (e) => {
+                this.mouseX = e.clientX;
+                this.mouseY = e.clientY;
+                const navButtons = document.querySelectorAll('.nav-button');
+                navButtons.forEach(btn => {
+                    btn.classList.add('visible');
+                });
+                this.resetInactivityTimer();
+            });
+
+            // Check for URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+
+            // Check for message stored in localStorage from search redirect
+            const storedMessage = localStorage.getItem('bijukaru_message');
+            if (storedMessage) {
+                this.showUrlMessage(storedMessage);
+                localStorage.removeItem('bijukaru_message'); // Clear after showing
+            }
+
+            // Check for message parameter (for direct link sharing)
+            const message = urlParams.get('message');
+            if (message) {
+                // Display the message overlay
+                this.showUrlMessage(decodeURIComponent(message));
+
+                // Remove the message parameter from the URL without reloading
+                urlParams.delete('message');
+                const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+                replaceState(newUrl.toString(), {});
+            }
+
+            // Fetch media sources
+            await this.loadMediaSources();
+            // Check for media source parameter
+            const mediaSourceParam = urlParams.get('media_source');
+            if (mediaSourceParam) {
+                this.selectedMediaSource = mediaSourceParam;
+            }
+
+            // Fetch categories first
             await this.loadCategories();
-        }
 
-        // Track mouse position
-        this.mouseX = 0;
-        this.mouseY = 0;
-        document.addEventListener('mousemove', (e) => {
-            this.mouseX = e.clientX;
-            this.mouseY = e.clientY;
-            const navButtons = document.querySelectorAll('.nav-button');
-            navButtons.forEach(btn => {
-                btn.classList.add('visible');
-            });
-            this.resetInactivityTimer();
-        });
-
-        // Check for URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-
-        // Check for message stored in localStorage from search redirect
-        const storedMessage = localStorage.getItem('bijukaru_message');
-        if (storedMessage) {
-            this.showUrlMessage(storedMessage);
-            localStorage.removeItem('bijukaru_message'); // Clear after showing
-        }
-
-        // Check for message parameter (for direct link sharing)
-        const message = urlParams.get('message');
-        if (message) {
-            // Display the message overlay
-            this.showUrlMessage(decodeURIComponent(message));
-
-            // Remove the message parameter from the URL without reloading
-            urlParams.delete('message');
-            const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
-            replaceState(newUrl.toString(), {});
-        }
-
-        // Fetch media sources
-        await this.loadMediaSources();
-        // Check for media source parameter
-        const mediaSourceParam = urlParams.get('media_source');
-        if (mediaSourceParam) {
-            this.selectedMediaSource = mediaSourceParam;
-        }
-
-        // Fetch categories first
-        await this.loadCategories();
-
-        // Check for category parameter
-        const categoryParam = urlParams.get('category');
-        if (categoryParam) {
-            this.selectedCategory = categoryParam;
-            // Find the index of this category
-            this.categoryIndex = Math.max(0, this.categories.findIndex(c => c.id === categoryParam));
-        } else if (this.categories.length > 0 && this.categories[0].id) {
-            // If no category in URL but we have categories, use the first one
-            this.selectedCategory = this.categories[0].id;
-            this.categoryIndex = 0;
-            // Update URL to include the category
-            const url = new URL(window.location.href);
-            url.searchParams.set('category', this.selectedCategory);
-            replaceState(url.toString(), {});
-        }
-
-        // Check for image_id parameter (will be used after loading items)
-        this.targetImageId = urlParams.get('image_id');
-
-        // Check for interval parameter
-        const intervalParam = urlParams.get('interval');
-        if (intervalParam && !isNaN(Number(intervalParam))) {
-            // Allow interval of 0 to disable auto-sliding
-            const parsedInterval = parseInt(intervalParam);
-            this.slideInterval = parsedInterval > 0 ? parsedInterval * 1000 : 0;
-            this.originalInterval = this.slideInterval;
-        }
-
-        // Check for paused parameter
-        const pausedParam = urlParams.get('paused');
-        if (pausedParam === 'true' || pausedParam === '1') {
-            this.isPaused = true;
-            this.originalInterval = this.slideInterval;
-            this.slideInterval = 0;
-        }
-
-        // Check for HD parameter
-        const hdParam = urlParams.get('hd');
-        if (hdParam === 'true' || hdParam === '1') {
-            this.isHD = true;
-        }
-
-        // Check for prefetch parameter
-        const prefetchParam = urlParams.get('prefetch');
-        if (prefetchParam && !isNaN(Number(prefetchParam))) {
-            // Set the number of images to prefetch, with a reasonable limit
-            this.nToPrefetch = Math.min(10, Math.max(0, parseInt(prefetchParam)));
-        }
-
-        // Check for fullscreen parameter and set toolbar visibility if requested
-        const fullscreenParam = urlParams.get('fullscreen');
-        if (fullscreenParam === 'true' || fullscreenParam === '1') {
-            // Simply hide the toolbar without using native fullscreen
-            this.hideToolbar = true;
-        }
-
-        // Check for showDescription parameter
-        const showDescParam = urlParams.get('showDescription');
-        if (showDescParam === 'true' || showDescParam === '1') {
-            this.showDescription = true;
-        }
-
-        // Add keyboard event listeners
-        document.addEventListener('keydown', (e) => {
-            // If search overlay is open, only process Escape key and ignore all other shortcuts
-            if (this.showSearchOverlay) {
-                if (e.key === 'Escape') {
-                    this.closeSearchOverlay();
-                }
-                return;
+            // Check for category parameter
+            const categoryParam = urlParams.get('category');
+            if (categoryParam) {
+                this.selectedCategory = categoryParam;
+                // Find the index of this category
+                this.categoryIndex = Math.max(0, this.categories.findIndex(c => c.id === categoryParam));
+            } else if (this.categories.length > 0 && this.categories[0].id) {
+                // If no category in URL but we have categories, use the first one
+                this.selectedCategory = this.categories[0].id;
+                this.categoryIndex = 0;
+                // Update URL to include the category
+                const url = new URL(window.location.href);
+                url.searchParams.set('category', this.selectedCategory);
+                replaceState(url.toString(), {});
             }
 
-            // Process normal shortcuts when search is closed
-            this.handleKeyDown(e);
-        });
+            // Check for image_id parameter (will be used after loading items)
+            this.targetImageId = urlParams.get('image_id');
 
-        const imageContainer = document.querySelector('.gallery-image');
-
-        // Add touch event for mobile
-        if (imageContainer) {
-            imageContainer.addEventListener('touchstart', () => {
-                // Don't show media source overlay on mobile
-                if (this.mediaSourceOverlayTimeoutId) {
-                    clearTimeout(this.mediaSourceOverlayTimeoutId);
-                }
-                if (this.mediaSourceOverlayTransitionId) {
-                    clearTimeout(this.mediaSourceOverlayTransitionId);
-                }
-                this.showMediaSourceOverlay = false;
-
-                this.showControls();
-                this.resetInactivityTimer();
-            });
-
-            // Track clicks
-            imageContainer.addEventListener('click', () => {
-                this.resetInactivityTimer();
-            });
-
-            // Add mouse events for desktop
-            imageContainer.addEventListener('mouseenter', () => {
-                this.showControls();
-            });
-
-            imageContainer.addEventListener('mouseleave', (e) => {
-                // Check if we're moving to a navigation button
-                // Get the element the mouse is moving to
-                const evt = e as unknown as MouseEvent;
-                const relatedTarget = evt.relatedTarget as Element;
-                if (relatedTarget &&
-                    (relatedTarget.classList.contains('category-nav-button') ||
-                        relatedTarget.closest('.category-nav-button'))) {
-                    // Moving to another navigation button, don't hide
-                    return;
-                }
-                // Hide after delay
-                setTimeout(this.hideControls, 1000);
-            });
-
-            // Add touch events for pausing slideshow while touching the image
-            imageContainer.addEventListener('touchstart', () => {
-                // Save current state before pausing
-                if (!this.isPaused) {
-                    this.wasPlayingBeforeTouch = true;
-                    this.togglePause();
-                }
-            });
-
-            imageContainer.addEventListener('touchend', () => {
-                // Resume only if it was playing before touch
-                if (this.wasPlayingBeforeTouch) {
-                    this.wasPlayingBeforeTouch = false;
-                    this.togglePause();
-                }
-            });
-        }
-
-        // Add event listeners to category buttons
-        document.querySelectorAll('.category-nav-button').forEach(btn => {
-            btn.addEventListener('mouseenter', () => {
-                this.showControls();
-            });
-
-            btn.addEventListener('mouseleave', (e) => {
-                // Only hide if not moving to another control
-                const evt = e as unknown as MouseEvent;
-                const relatedTarget = evt.relatedTarget as Element;
-                if (relatedTarget &&
-                    (relatedTarget.classList.contains('category-nav-button') ||
-                        relatedTarget.classList.contains('nav-button') ||
-                        relatedTarget.closest('.nav-button') ||
-                        relatedTarget.closest('.category-nav-button'))) {
-                    // Moving to another control, don't hide
-                    return;
-                }
-                setTimeout(this.hideControls, 1000);
-            });
-        });
-
-        // Load initial feed
-        await this.loadCategory();
-
-        // Check for search token in URL
-        const tokenParam = urlParams.get('token');
-        if (tokenParam) {
-            this.verifyAndStoreToken(tokenParam);
-        } else {
-            // Check if token exists in localStorage
-            const storedToken = localStorage.getItem('searchToken');
-            if (storedToken) {
-                this.searchToken = storedToken;
-                this.verifyToken(false); // Verify silently
+            // Check for interval parameter
+            const intervalParam = urlParams.get('interval');
+            if (intervalParam && !isNaN(Number(intervalParam))) {
+                // Allow interval of 0 to disable auto-sliding
+                const parsedInterval = parseInt(intervalParam);
+                this.slideInterval = parsedInterval > 0 ? parsedInterval * 1000 : 0;
+                this.originalInterval = this.slideInterval;
             }
+
+            // Check for paused parameter
+            const pausedParam = urlParams.get('paused');
+            if (pausedParam === 'true' || pausedParam === '1') {
+                this.isPaused = true;
+                this.originalInterval = this.slideInterval;
+                this.slideInterval = 0;
+            }
+
+            // Check for HD parameter
+            const hdParam = urlParams.get('hd');
+            if (hdParam === 'true' || hdParam === '1') {
+                this.isHD = true;
+            }
+
+            // Check for prefetch parameter
+            const prefetchParam = urlParams.get('prefetch');
+            if (prefetchParam && !isNaN(Number(prefetchParam))) {
+                // Set the number of images to prefetch, with a reasonable limit
+                this.nToPrefetch = Math.min(10, Math.max(0, parseInt(prefetchParam)));
+            }
+
+            // Check for fullscreen parameter and set toolbar visibility if requested
+            const fullscreenParam = urlParams.get('fullscreen');
+            if (fullscreenParam === 'true' || fullscreenParam === '1') {
+                // Simply hide the toolbar without using native fullscreen
+                this.hideToolbar = true;
+            }
+
+            // Check for showDescription parameter
+            const showDescParam = urlParams.get('showDescription');
+            if (showDescParam === 'true' || showDescParam === '1') {
+                this.showDescription = true;
+            }
+
+            // Add keyboard event listeners
+            document.addEventListener('keydown', (e) => {
+                // If search overlay is open, only process Escape key and ignore all other shortcuts
+                if (this.showSearchOverlay) {
+                    if (e.key === 'Escape') {
+                        this.closeSearchOverlay();
+                    }
+                    return;
+                }
+
+                // Process normal shortcuts when search is closed
+                this.handleKeyDown(e);
+            });
+
+            const imageContainer = document.querySelector('.gallery-image');
+
+            // Add touch event for mobile
+            if (imageContainer) {
+                imageContainer.addEventListener('touchstart', () => {
+                    // Don't show media source overlay on mobile
+                    if (this.mediaSourceOverlayTimeoutId) {
+                        clearTimeout(this.mediaSourceOverlayTimeoutId);
+                    }
+                    if (this.mediaSourceOverlayTransitionId) {
+                        clearTimeout(this.mediaSourceOverlayTransitionId);
+                    }
+                    this.showMediaSourceOverlay = false;
+
+                    this.showControls();
+                    this.resetInactivityTimer();
+                });
+
+                // Track clicks
+                imageContainer.addEventListener('click', () => {
+                    this.resetInactivityTimer();
+                });
+
+                // Add mouse events for desktop
+                imageContainer.addEventListener('mouseenter', () => {
+                    this.showControls();
+                });
+
+                imageContainer.addEventListener('mouseleave', (e) => {
+                    // Check if we're moving to a navigation button
+                    // Get the element the mouse is moving to
+                    const evt = e as unknown as MouseEvent;
+                    const relatedTarget = evt.relatedTarget as Element;
+                    if (relatedTarget &&
+                        (relatedTarget.classList.contains('category-nav-button') ||
+                            relatedTarget.closest('.category-nav-button'))) {
+                        // Moving to another navigation button, don't hide
+                        return;
+                    }
+                    // Hide after delay
+                    setTimeout(this.hideControls, 1000);
+                });
+
+                // Add touch events for pausing slideshow while touching the image
+                imageContainer.addEventListener('touchstart', () => {
+                    // Save current state before pausing
+                    if (!this.isPaused) {
+                        this.wasPlayingBeforeTouch = true;
+                        this.togglePause();
+                    }
+                });
+
+                imageContainer.addEventListener('touchend', () => {
+                    // Resume only if it was playing before touch
+                    if (this.wasPlayingBeforeTouch) {
+                        this.wasPlayingBeforeTouch = false;
+                        this.togglePause();
+                    }
+                });
+            }
+
+            // Add event listeners to category buttons
+            document.querySelectorAll('.category-nav-button').forEach(btn => {
+                btn.addEventListener('mouseenter', () => {
+                    this.showControls();
+                });
+
+                btn.addEventListener('mouseleave', (e) => {
+                    // Only hide if not moving to another control
+                    const evt = e as unknown as MouseEvent;
+                    const relatedTarget = evt.relatedTarget as Element;
+                    if (relatedTarget &&
+                        (relatedTarget.classList.contains('category-nav-button') ||
+                            relatedTarget.classList.contains('nav-button') ||
+                            relatedTarget.closest('.nav-button') ||
+                            relatedTarget.closest('.category-nav-button'))) {
+                        // Moving to another control, don't hide
+                        return;
+                    }
+                    setTimeout(this.hideControls, 1000);
+                });
+            });
+
+            // Load initial feed
+            await this.loadCategory();
+
+            // Check for search token in URL
+            const tokenParam = urlParams.get('token');
+            if (tokenParam) {
+                this.verifyAndStoreToken(tokenParam);
+            } else {
+                // Check if token exists in localStorage
+                const storedToken = localStorage.getItem('searchToken');
+                if (storedToken) {
+                    this.searchToken = storedToken;
+                    this.verifyToken(false); // Verify silently
+                }
+            }
+
+            // Load liked images from localStorage
+            this.loadLikedImages();
+
+            // Load archived curated feeds from localStorage
+            this.loadArchivedCuratedFeeds();
         }
-
-        // Load liked images from localStorage
-        this.loadLikedImages();
-
-        // Load archived curated feeds from localStorage
-        this.loadArchivedCuratedFeeds();
-
     }
+
+    private async initializeSync() {
+        try {
+            // Check if there's an existing device token
+            const savedToken = localStorage.getItem('deviceToken');
+
+            if (savedToken) {
+                // Try to connect with existing token
+                this.deviceToken = savedToken;
+                const success = await syncService.initializeSync(savedToken);
+                if (success) {
+                    this.syncInitialized = true;
+                    this.setupSyncListeners();
+                    console.log('Sync connected with existing token:', savedToken);
+                } else {
+                    console.warn('Failed to connect with saved token, will create new one if needed');
+                }
+            }
+        } catch (error) {
+            console.error('Failed to initialize sync:', error);
+        }
+    }
+
+    private setupSyncListeners() {
+        // Listen for sync updates and merge them with local state
+        syncService.addSyncListener(() => {
+            try {
+                // Get synced data
+                const syncedFavourites = syncService.getFavourites();
+                const syncedLikedImages = syncService.getLikedImages();
+
+                // Merge favourites
+                const mergedFavourites = new Map(this.favourites);
+                syncedFavourites.forEach((categoryIds, mediaSource) => {
+                    const existing = mergedFavourites.get(mediaSource) || new Set();
+                    categoryIds.forEach(id => existing.add(id));
+                    mergedFavourites.set(mediaSource, existing);
+                });
+                this.favourites = mergedFavourites;
+
+                // Merge liked images (avoid duplicates by ID)
+                const existingIds = new Set(this.likedImages.map(img => img.id));
+                const newImages = syncedLikedImages.filter(img => !existingIds.has(img.id));
+                this.likedImages = [...this.likedImages, ...newImages];
+
+                // Save locally as backup
+                this.saveFavourites();
+                this.saveLikedImages();
+
+                console.log('Synced data merged');
+            } catch (error) {
+                console.error('Error handling sync update:', error);
+            }
+        });
+    }
+
+    // Generate a new device token and initialize sync
+    async generateAndConnectDeviceToken(): Promise<string | null> {
+        try {
+            // Generate token locally for immediate use
+            const token = this.generateDeviceToken();
+
+            // Save token
+            localStorage.setItem('deviceToken', token);
+            this.deviceToken = token;
+
+            // Initialize sync with new token
+            const success = await syncService.initializeSync(token);
+            if (success) {
+                this.syncInitialized = true;
+                this.setupSyncListeners();
+
+                // Push current data to sync
+                await this.pushToSync();
+
+                console.log('New device token generated and sync initialized:', token);
+                return token;
+            } else {
+                console.error('Failed to initialize sync with new token');
+                return null;
+            }
+        } catch (error) {
+            console.error('Failed to generate device token:', error);
+            return null;
+        }
+    }
+
+    // Connect with an existing device token
+    async connectWithDeviceToken(token: string): Promise<boolean> {
+        try {
+            if (token.length !== 8) {
+                throw new Error('Invalid token format');
+            }
+
+            // Initialize sync with provided token
+            const success = await syncService.initializeSync(token);
+            if (success) {
+                // Save token and update state
+                localStorage.setItem('deviceToken', token);
+                this.deviceToken = token;
+                this.syncInitialized = true;
+                this.setupSyncListeners();
+
+                // Push current data to sync
+                await this.pushToSync();
+
+                console.log('Connected with device token:', token);
+                return true;
+            } else {
+                console.error('Failed to connect with device token');
+                return false;
+            }
+        } catch (error) {
+            console.error('Error connecting with device token:', error);
+            return false;
+        }
+    }
+
+    // Push current local data to sync
+    private async pushToSync() {
+        if (this.syncInitialized) {
+            try {
+                syncService.updateFavourites(this.favourites);
+                syncService.updateLikedImages(this.likedImages);
+                console.log('Local data pushed to sync');
+            } catch (error) {
+                console.error('Failed to push data to sync:', error);
+            }
+        }
+    }
+
+    // Disconnect from sync
+    async disconnectSync() {
+        try {
+            await syncService.disconnect();
+            this.syncInitialized = false;
+            this.deviceToken = null;
+            localStorage.removeItem('deviceToken');
+            console.log('Disconnected from sync');
+        } catch (error) {
+            console.error('Error disconnecting from sync:', error);
+        }
+    }
+
+    // Get sync status
+    getSyncStatus() {
+        return {
+            connected: this.syncInitialized && syncService.isConnectedToSync(),
+            deviceToken: this.deviceToken,
+            hasToken: !!this.deviceToken
+        };
+    }
+
+    private generateDeviceToken(): string {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let token = '';
+        for (let i = 0; i < 8; i++) {
+            token += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return token;
+    }
+
+    // ... rest of the existing methods remain unchanged ...
+
     handleImageError = (event: Event) => {
 
         (event.target as HTMLImageElement).src = 'https://placehold.co/600x400?text=Image+Not+Available';
@@ -1246,6 +1439,10 @@ export class GalleryStateClass implements GalleryState {
             case 'L':
                 this.toggleLikeImage();
                 break;
+            case 'y':
+            case 'Y':
+                this.openSyncOverlay();
+                break;
             default:
                 break;
         }
@@ -1743,73 +1940,40 @@ export class GalleryStateClass implements GalleryState {
         const category = categoryIdInput || (this.showFavourites && this.currentItem?.category_id) || this.selectedCategory;
 
         if (!category || !mediaSource) {
-            console.warn("ToggleFavourite: category or mediaSource missing", category, mediaSource);
+            console.warn('Cannot toggle favourite: missing category or media source');
             return;
         }
 
         if (!this.favourites.has(mediaSource)) {
-            this.favourites.set(mediaSource, new Set());
+            this.favourites.set(mediaSource, new Set<string>());
         }
 
         const sourceCategories = this.favourites.get(mediaSource)!;
-        // let isNowFavourite = false; // This variable was declared but its value never read.
 
         if (sourceCategories.has(category)) {
             sourceCategories.delete(category);
             this.showUrlMessage('Removed from favourites');
-            // isNowFavourite = false; // This variable was declared but its value never read.
+
+            // Clean up empty source entries
+            if (sourceCategories.size === 0) {
+                this.favourites.delete(mediaSource);
+            }
 
             if (this.showFavourites) {
-                const categoryIdToRemove = category;
-                const mediaSourceIdToRemove = mediaSource;
-
-                this.items = this.items.filter(item =>
-                    !(item.category_id === categoryIdToRemove && item.media_source === mediaSourceIdToRemove)
-                );
-
-                if (this.items.length === 0) { // Current favourites view is empty
-                    // Check if *any* favourites remain in the this.favourites map across all sources
-                    let noFavouritesLeftAtAll = true;
-                    this.favourites.forEach(set => {
-                        if (set.size > 0) {
-                            noFavouritesLeftAtAll = false;
-                        }
-                    });
-
-                    if (noFavouritesLeftAtAll) {
-                        // All favourites are gone from the system. Redirect to a non-custom source.
-                        this.showFavourites = false;
-                        this.showLikedImages = false; // Ensure this is also off
-
-                        const firstNonCustomSource = this.mediaSources.find(s => s.id !== BIJUKARU_CUSTOM_SOURCE_ID);
-                        if (firstNonCustomSource) {
-                            this.selectedMediaSource = firstNonCustomSource.id;
-                            this.selectedCategory = ""; // Will be set by loadCategories to the first of the new source
-                            this.previousSelectedMediaSource = null; // Clear previous state
-                            this.previousSelectedCategory = null;
-
-                            // Asynchronously load categories and then the content for the new source/category.
-                            (async () => {
-                                await this.loadCategories();
-                                await this.loadCategory();
-                            })();
-                        } else {
-                            // Highly unlikely fallback: No non-custom sources exist.
-                            this.items = [];
-                            this.error = "No media sources available to display.";
-                            this.loading = false;
-                            this.updateURL();
-                            this.updateDocumentTitle();
-                            this.stopAutoSlide();
-                        }
-                        return; // Exit toggleFavourite as we've handled the redirection
-                    } else {
-                        // Favourites still exist elsewhere in the system, but this specific view became empty.
-                        this.toggleShowFavourites(); // This will handle restoring previous state or defaulting.
-                        return; // Exit toggleFavourite
-                    }
+                this.loadAllFavourites();
+                if (!this.hasFavourites()) {
+                    // No favourites left anywhere in the system
+                    this.showFavourites = false;
+                    this.selectedMediaSource = this.previousSelectedMediaSource || DEFAULT_MEDIA_SOURCE_ID;
+                    this.selectedCategory = this.previousSelectedCategory || '';
+                    this.previousSelectedMediaSource = null;
+                    this.previousSelectedCategory = null;
+                    this.loadCategory();
+                    this.showUrlMessage('No more favourites. Returning to main gallery.');
+                    this.updateDocumentTitle();
+                    this.stopAutoSlide();
+                    return;
                 } else {
-                    // Items still remain in the current favourites view, just update the current item.
                     this.currentIndex = Math.max(0, Math.min(this.currentIndex, this.items.length - 1));
                     this.updateDocumentTitle();
                     this.updateURL();
@@ -1820,11 +1984,15 @@ export class GalleryStateClass implements GalleryState {
         } else {
             sourceCategories.add(category);
             this.showUrlMessage('Added to favourites');
-            // isNowFavourite = true; // This variable was declared but its value never read.
         }
 
         this.favourites = new Map(this.favourites);
         this.saveFavourites();
+
+        // Push to sync if connected
+        if (this.syncInitialized) {
+            syncService.updateFavourites(this.favourites);
+        }
     }
 
     isFavourite = (categoryIdInput?: string, mediaSourceIdInput?: string) => {
@@ -2004,38 +2172,26 @@ export class GalleryStateClass implements GalleryState {
     }
 
     toggleLikeImage = () => {
-        if (!this.currentItem) return;
+        const currentItem = this.currentItem;
+        if (!currentItem) return;
 
-        const isLiked = this.isImageLiked();
-        if (isLiked) {
+        const index = this.likedImages.findIndex(item => item.id === currentItem.id);
+
+        if (index !== -1) {
             // Remove from liked images
-            this.likedImages = this.likedImages.filter(img => img.id !== this.currentItem?.id);
-            this.saveLikedImages();
-
-            // If we're viewing liked images, remove from current view
-            if (this.showLikedImages) {
-                this.items = this.items.filter(item => item.id !== this.currentItem?.id);
-                if (this.items.length === 0) {
-                    // If no more liked images, exit liked images view
-                    this.showLikedImages = false;
-                    this.updateURL();
-                    this.updateDocumentTitle();
-                } else {
-                    // Adjust current index if needed
-                    this.currentIndex = Math.min(this.currentIndex, this.items.length - 1);
-                }
-            }
+            this.likedImages.splice(index, 1);
+            this.showUrlMessage('Removed from liked images');
         } else {
-            // Add to liked images with source information
-            if (this.currentItem) {
-                const likedImage = {
-                    ...this.currentItem,
-                    sourceCategory: this.getCurrentCategoryName(),
-                    media_source: this.selectedMediaSource
-                };
-                this.likedImages.push(likedImage);
-                this.saveLikedImages();
-            }
+            // Add to liked images
+            this.likedImages.push(currentItem);
+            this.showUrlMessage('Added to liked images');
+        }
+
+        this.saveLikedImages();
+
+        // Push to sync if connected
+        if (this.syncInitialized) {
+            syncService.updateLikedImages(this.likedImages);
         }
     }
 
@@ -2141,66 +2297,211 @@ export class GalleryStateClass implements GalleryState {
 
     // Internal method to load a specific archived curated feed from stored data
     _loadSpecificCuratedFeed = (feed: ArchivedCuratedFeed) => {
-        console.log(`Loading archived curated feed: ${feed.name} from stored items.`);
         this.loading = true;
         this.error = null;
-        this.items = []; // Clear current items
-        this.showFavourites = false; // Ensure these are off
+
+        // Store previous state if not already in a custom view
+        if (this.selectedMediaSource !== BIJUKARU_CUSTOM_SOURCE_ID) {
+            this.previousSelectedMediaSource = this.selectedMediaSource;
+            this.previousSelectedCategory = this.selectedCategory;
+        }
+
+        this.selectedMediaSource = BIJUKARU_CUSTOM_SOURCE_ID;
+        this.showFavourites = false;
         this.showLikedImages = false;
 
+        // Set the categories to just this one
+        this.categories = [{ id: feed.id, name: feed.name }];
+        this.selectedCategory = feed.id;
+        this.category = this.categories[0];
+        this.categoryIndex = 0;
+
+        // Load the items
+        this.items = feed.items || [];
+        this.currentIndex = 0;
+
+        // Start auto slide if not paused
+        if (!this.isPaused) {
+            this.startAutoSlide();
+        }
+
+        // Update document title and URL
+        this.updateDocumentTitle();
+        this.updateURL();
+
+        this.loading = false;
+
+        // Show the stored message if available
+        if (feed.userfriendly_message) {
+            this.showUrlMessage(feed.userfriendly_message);
+        }
+    }
+
+    // Add missing loadFavouritesCategory method to satisfy interface
+    loadFavouritesCategory = async () => {
+        // This method is called to load a specific favourites category
+        // For now, we'll delegate to loadAllFavourites
+        await this.loadAllFavourites();
+    }
+
+    // Sync method signatures
+    generateAndConnectDeviceToken = async (): Promise<string | null> => {
         try {
-            if (feed.items && feed.id && feed.name) {
-                this.items = [...feed.items]; // Use a copy of the stored items
-                this.category = { id: feed.id, name: feed.name };
-                this.selectedCategory = this.category.id; // Ensure selectedCategory matches the loaded feed ID
-                this.currentIndex = 0;
+            // Generate token locally for immediate use
+            const token = this.generateDeviceToken();
 
-                if (this.items.length === 0) {
-                    this.error = 'Archived curated feed is empty.';
-                } else {
-                    this.error = null;
-                }
+            // Save token
+            localStorage.setItem('deviceToken', token);
+            this.deviceToken = token;
 
-                // Ensure the categories dropdown still reflects the custom source options + this loaded one
-                const customCategories: Category[] = [
-                    { id: FAVOURITES_CATEGORY_ID, name: 'Favourites' },
-                    { id: LIKED_CATEGORY_ID, name: 'Liked Images' },
-                    ...this.archivedCuratedFeeds.map(f => ({ id: f.id, name: f.name }))
-                ];
-                this.categories = customCategories;
-                this.categoryIndex = Math.max(0, this.categories.findIndex(c => c.id === this.selectedCategory));
+            // Initialize sync with new token
+            const success = await syncService.initializeSync(token);
+            if (success) {
+                this.syncInitialized = true;
+                this.setupSyncListeners();
 
-                this.updateProgressBar();
-                this.updateURL();
-                this.updateDocumentTitle();
-                this.prefetchNextImages();
-                this.startAutoSlide();
+                // Push current data to sync
+                await this.pushToSync();
 
-                // Display user-friendly message if it exists
-                if (feed.userfriendly_message) {
-                    this.showUrlMessage(feed.userfriendly_message);
-                }
+                console.log('New device token generated and sync initialized:', token);
+                return token;
             } else {
-                throw new Error("Invalid archived curated feed data.");
+                console.error('Failed to initialize sync with new token');
+                return null;
             }
-        } catch (err: any) {
-            console.error('Error loading archived curated feed:', err);
-            this.error = err.message || 'An error occurred while loading the archived curated feed.';
-            this.items = []; // Clear items on error
+        } catch (error) {
+            console.error('Failed to generate device token:', error);
+            return null;
+        }
+    };
+
+    connectWithDeviceToken = async (token: string): Promise<boolean> => {
+        try {
+            if (token.length !== 8) {
+                throw new Error('Invalid token format');
+            }
+
+            // Initialize sync with provided token
+            const success = await syncService.initializeSync(token);
+            if (success) {
+                // Save token and update state
+                localStorage.setItem('deviceToken', token);
+                this.deviceToken = token;
+                this.syncInitialized = true;
+                this.setupSyncListeners();
+
+                // Push current data to sync
+                await this.pushToSync();
+
+                console.log('Connected with device token:', token);
+                return true;
+            } else {
+                console.error('Failed to connect with device token');
+                return false;
+            }
+        } catch (error) {
+            console.error('Error connecting with device token:', error);
+            return false;
+        }
+    };
+
+    disconnectSync = async (): Promise<void> => {
+        try {
+            await syncService.disconnect();
+            this.syncInitialized = false;
+            this.deviceToken = null;
+            localStorage.removeItem('deviceToken');
+            console.log('Disconnected from sync');
+        } catch (error) {
+            console.error('Error disconnecting from sync:', error);
+        }
+    };
+
+    getSyncStatus = (): { connected: boolean; deviceToken: string | null; hasToken: boolean } => {
+        return {
+            connected: this.syncInitialized && syncService.isConnectedToSync(),
+            deviceToken: this.deviceToken,
+            hasToken: !!this.deviceToken
+        };
+    };
+
+    // Sync UI methods
+    openSyncOverlay = () => {
+        this.showSyncOverlay = true;
+        this.syncError = null; // Clear any previous errors
+    }
+
+    closeSyncOverlay = () => {
+        this.showSyncOverlay = false;
+        this.syncTokenInput = ""; // Clear input
+        this.syncError = null; // Clear errors
+        this.syncGenerating = false;
+        this.syncConnecting = false;
+    }
+
+    handleGenerateToken = async (): Promise<void> => {
+        this.syncGenerating = true;
+        this.syncError = null;
+
+        try {
+            const token = await this.generateAndConnectDeviceToken();
+            if (token) {
+                this.showUrlMessage(`Device token generated: ${token}`);
+                this.closeSyncOverlay();
+            } else {
+                this.syncError = 'Failed to generate token';
+            }
+        } catch (error) {
+            console.error('Error generating token:', error);
+            this.syncError = 'Failed to generate token';
         } finally {
-            this.loading = false;
+            this.syncGenerating = false;
+        }
+    }
+
+    handleConnectWithToken = async (): Promise<void> => {
+        if (!this.syncTokenInput || this.syncTokenInput.length !== 8) {
+            this.syncError = 'Token must be exactly 8 characters';
+            return;
+        }
+
+        this.syncConnecting = true;
+        this.syncError = null;
+
+        try {
+            const success = await this.connectWithDeviceToken(this.syncTokenInput);
+            if (success) {
+                this.showUrlMessage(`Connected with token: ${this.syncTokenInput}`);
+                this.closeSyncOverlay();
+            } else {
+                this.syncError = 'Failed to connect with token';
+            }
+        } catch (error) {
+            console.error('Error connecting with token:', error);
+            this.syncError = 'Failed to connect with token';
+        } finally {
+            this.syncConnecting = false;
+        }
+    }
+
+    handleDisconnectSync = async (): Promise<void> => {
+        try {
+            await this.disconnectSync();
+            this.showUrlMessage('Disconnected from sync');
+            this.closeSyncOverlay();
+        } catch (error) {
+            console.error('Error disconnecting from sync:', error);
+            this.syncError = 'Failed to disconnect from sync';
         }
     }
 }
 
-// Create a context key
-const GALLERY_CONTEXT = 'gallery';
+export const GALLERY_CONTEXT = 'gallery-state';
 
 export const getGalleryState = (key = GALLERY_CONTEXT) => {
-    return getContext<GalleryState>(key);
+    return getContext(key) as GalleryStateClass;
 };
 
 export const setGalleryState = (key = GALLERY_CONTEXT) => {
-    const galleryState = new GalleryStateClass();
-    return setContext(key, galleryState);
+    return setContext(key, new GalleryStateClass());
 };
