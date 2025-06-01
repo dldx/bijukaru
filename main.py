@@ -17,6 +17,7 @@ from guardian_photos import get_guardian_categories, get_guardian_photos_feed
 from reddit import get_reddit_feed, get_reddit_categories
 from wikiart import get_popular_artists, get_wikiart_feed, get_wikiart_categories
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 
 # Import for structured search and curation
 from llm_research import (
@@ -42,17 +43,86 @@ else:
 
 app = FastAPI()
 
+# Add CORS middleware if not already present
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 if os.getenv("SEARCH_TOKEN") is None:
     raise ValueError("SEARCH_TOKEN is not set in the environment variables")
 
 # Set up templates
 templates = Jinja2Templates(directory="templates")
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Mount Svelte SPA static files
-app.mount("/_app", StaticFiles(directory="static/spa/_app"), name="spa-assets")
+# Custom StaticFiles class with proper cache headers
+class CacheControlStaticFiles(StaticFiles):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def file_response(self, full_path, stat_result, scope, status_code=200):
+        response = super().file_response(full_path, stat_result, scope, status_code)
+
+        # Get the file extension and path
+        path = scope.get("path", "")
+
+        # Versioned assets (contain hashes) - cache for 1 year
+        if any(pattern in path for pattern in ["-", ".", "_"]) and any(
+            ext in path
+            for ext in [
+                ".js",
+                ".css",
+                ".woff",
+                ".woff2",
+                ".ttf",
+                ".eot",
+                ".svg",
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".gif",
+                ".webp",
+                ".ico",
+            ]
+        ):
+            # If filename contains hash-like patterns, cache aggressively
+            if (
+                len(
+                    [
+                        part
+                        for part in path.split("/")[-1].split(".")[0].split("-")
+                        if len(part) >= 8
+                    ]
+                )
+                > 0
+            ):
+                response.headers["Cache-Control"] = (
+                    "public, max-age=31536000, immutable"
+                )
+            else:
+                # Other static assets - cache for 1 hour with revalidation
+                response.headers["Cache-Control"] = (
+                    "public, max-age=3600, must-revalidate"
+                )
+        # HTML files - no cache or short cache
+        elif path.endswith(".html"):
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        else:
+            # Default for other files
+            response.headers["Cache-Control"] = "public, max-age=3600, must-revalidate"
+
+        return response
+
+
+# Mount static files with custom cache control
+app.mount("/static", CacheControlStaticFiles(directory="static"), name="static")
+app.mount(
+    "/_app", CacheControlStaticFiles(directory="static/spa/_app"), name="spa-assets"
+)
 
 media_sources = {
     "apod": {
