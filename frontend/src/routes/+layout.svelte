@@ -27,7 +27,7 @@
 
 </script>
 
-<div style="background-color: #121212" class="bg-gray-100 dark:bg-dark-bg text-gray-900 dark:text-dark-text transition-colors duration-300 main-container">
+<div class="bg-gray-100 dark:bg-dark-bg text-gray-900 dark:text-dark-text transition-colors duration-300 main-container">
     <!-- Help Overlay -->
     {#if galleryState.showHelp}
         <div class="help-overlay" onclick={(e) => { e.stopPropagation(); galleryState.showHelp = false }}
